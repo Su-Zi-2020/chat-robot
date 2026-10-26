@@ -46,11 +46,13 @@ GET /api/messages
 ```
 agent/
 ├── web/
-│   ├── index.html
+│   ├── index.html          Vite 的入口（不能删，见下）
 │   ├── vite.config.js      proxy: /api → localhost:3100
 │   └── src/
-│       ├── main.js
-│       ├── App.vue         聊天界面
+│       ├── main.js         挂载 #app
+│       ├── App.vue         根组件：只放全局壳
+│       ├── views/
+│       │   └── ChatView.vue   聊天页（页面逻辑都在这里）
 │       └── style.css
 └── server/
     ├── package.json
@@ -82,3 +84,14 @@ git checkout minimal    # 当前：Vue + Express，无模型
 
 - nginx 托管 `dist/`，`/api` 反代到 Node；
 - 或 Express `app.use(express.static('../web/dist'))`，一个进程搞定。
+
+
+## 为什么 index.html 不能删
+
+它不是“页面”，是 **Vite 的构建入口**——只负责挂一个 `<div id="app">` 和引入 `main.js`。删掉之后：
+
+```
+[UNRESOLVED_ENTRY] Cannot resolve entry module index.html.
+```
+
+想看页面代码，去 `src/views/ChatView.vue`。
