@@ -12,13 +12,13 @@
 响应体统一信封：
 
 ```json
-{ "code": 0, "message": "ok", "data": { ... } }
+{ "code": 0, "message": "success", "data": { ... } }
 ```
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `code` | number | `0` 表示成功，非 0 表示失败 |
-| `message` | string | 给用户看的提示；成功时为 `"ok"` |
+| `message` | string | 给用户看的提示；成功时为 `"success"` |
 | `data` | object \| null | 成功时的业务数据；失败时不返回 |
 
 **业务码**
@@ -65,7 +65,7 @@ Content-Type: application/json
 **成功**
 
 ```json
-{ "code": 0, "message": "ok", "data": { "reply": "我收到了：「你好」。…" } }
+{ "code": 0, "message": "success", "data": { "reply": "我收到了：「你好」。…" } }
 ```
 
 **失败**
@@ -99,7 +99,7 @@ Content-Type: application/json
 ```json
 {
   "code": 0,
-  "message": "ok",
+  "message": "success",
   "data": {
     "messages": [
       { "role": "user", "content": "你好" },

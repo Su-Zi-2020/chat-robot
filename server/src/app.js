@@ -18,10 +18,10 @@ app.use((_req, res) => fail(res, 404, CODE.NOT_FOUND, '接口不存在'));
 
 // 任何异常都收敛成信封，不漏 HTML
 app.use((err, _req, res, _next) => {
-  if (err?.type === 'entity.parse.failed') return fail(res, 400, CODE.BAD_JSON, '请求体不是合法 JSON');
-  if (err?.type === 'entity.too.large') return fail(res, 413, CODE.TOO_LARGE, '请求体过大');
-  console.error('[unhandled]', err);
-  fail(res, 500, CODE.INTERNAL, '服务内部错误');
+    if (err?.type === 'entity.parse.failed') return fail(res, 400, CODE.BAD_JSON, '请求体不是合法 JSON');
+    if (err?.type === 'entity.too.large') return fail(res, 413, CODE.TOO_LARGE, '请求体过大');
+    console.error('[unhandled]', err);
+    fail(res, 500, CODE.INTERNAL, '服务内部错误');
 });
 
 export default app;

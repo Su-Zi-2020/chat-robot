@@ -1,6 +1,6 @@
 // POST /api/chat —— 发一句话，拿回一条回复。
 import { Router } from 'express';
-import { ok, fail, CODE } from '../http.js';
+import { success, fail, CODE } from '../http.js';
 import { appendExchange } from './store.js';
 import { generateReply } from '../services/reply.js';
 
@@ -24,7 +24,7 @@ router.post('/', (req, res) => {
   const reply = generateReply(text);
   appendExchange(text, reply);
 
-  ok(res, { reply });
+  success(res, { reply });
 });
 
 export default router;
