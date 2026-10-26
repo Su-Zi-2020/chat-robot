@@ -1,52 +1,39 @@
-# 最简对话 demo
+# 最简对话 demo（Vue + Express）
 
-**没有大模型、没有流式、没有依赖。** 只有一个 Node 服务和一张页面：
-浏览器发一句话 → 后端回一句占位的话 → 显示出来。
+**没有大模型、没有流式。** 前后端分离，两个项目：
 
-用来先把“前后端能通”这件事跑通，再往上加东西。
+- `web/`  Vue 3 + Vite，开发端口 5173
+- `server/`  Express，端口 3100
 
-## 跑起来
+功能只有一件事：你发一句话，后端回一句占位的话。
 
-```bash
-cd ~/code/agent
-node server/index.js
-# 打开 http://localhost:3000
-```
-
-改代码想自动重启：
+## 跑起来（两个终端）
 
 ```bash
-node --watch server/index.js
+# 终端 A：后端
+cd server
+npm install        # 第一次
+npm run dev        # 改代码自动重启 → http://localhost:3100
+
+# 终端 B：前端
+cd web
+npm install        # 第一次
+npm run dev        # → http://localhost:5173
 ```
 
-## 结构
+打开 **http://localhost:5173**（注意是 5173，不是 3100）。
 
-```
-agent/
-├── server/index.js     76 行   HTTP 服务 + 假回复 + 静态托管
-├── public/index.html  136 行   页面（HTML + CSS + JS，无需构建）
-└── docs/api.md                 接口说明
-```
+`vite.config.js` 里配了 proxy，`/api/*` 会转发到 3100，所以：
 
-没有 `npm install`，没有 `node_modules`，没有构建步骤。
-
-## 现在有什么
-
-| 功能 | 状态 |
-|---|---|
-| 发送消息、显示回复 | ✅ |
-| 空白输入校验（400） | ✅ |
-| 刷新页面恢复历史（内存里） | ✅ |
-| 大模型 | ❌ 占位回复 |
-| 流式输出 | ❌ 一次性返回 |
-| 持久化 | ❌ 重启就清空 |
+- 后端不用装 `cors`
+- 前端写 `fetch('/api/chat')` 就行，不用写完整地址
 
 ## 接口
 
 ```http
 POST /api/chat
 { "text": "你好" }
-→ { "reply": "我收到了：「你好」。这是一个占位回复……" }
+→ { "reply": "我收到了：「你好」。这是一个占位回复…" }
 ```
 
 ```http
@@ -54,13 +41,44 @@ GET /api/messages
 → { "messages": [{ "role": "user", "content": "…" }, …] }
 ```
 
-## 完整版在哪
+## 结构
 
-这个仓库有两个分支：
-
-```bash
-git checkout main        # 完整版：接 DeepSeek、SSE 流式、React 前端、多轮会话
-git checkout minimal     # 当前：最简 demo
+```
+agent/
+├── web/
+│   ├── index.html
+│   ├── vite.config.js      proxy: /api → localhost:3100
+│   └── src/
+│       ├── main.js
+│       ├── App.vue         聊天界面
+│       └── style.css
+└── server/
+    ├── package.json
+    └── src/
+        ├── app.js          Express 路由 + 假回复
+        └── server.js       监听端口
 ```
 
-完整版的说明见那个分支里的 README。
+## 现在有什么
+
+| 功能 | 状态 |
+|---|---|
+| 发消息、显示回复 | ✅ |
+| 空输入校验（400） | ✅ |
+| 刷新页面恢复历史 | ✅（内存里，重启就清空） |
+| 大模型 | ❌ 占位回复 |
+| 流式 | ❌ 一次性返回 |
+
+## 分支
+
+```bash
+git checkout main       # 完整版：接 DeepSeek、SSE 流式、React 前端
+git checkout minimal    # 当前：Vue + Express，无模型
+```
+
+## 生产部署（以后）
+
+前端 `npm run build` 出 `dist/`，两种托管方式二选一：
+
+- nginx 托管 `dist/`，`/api` 反代到 Node；
+- 或 Express `app.use(express.static('../web/dist'))`，一个进程搞定。

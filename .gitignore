@@ -1,8 +1,7 @@
 node_modules/
 web/node_modules/
 web/dist/
-web/tsconfig.tsbuildinfo
-.env
+server/node_modules/
 
 # 含 API key 的本地配置，不要提交
 server/config/config.js
