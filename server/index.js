@@ -71,6 +71,14 @@ const server = http.createServer(async (req, res) => {
   json(res, 404, { error: 'Not Found' });
 });
 
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error(`端口 ${PORT} 已被占用。换一个：PORT=3001 node server/index.js`);
+    process.exit(1);
+  }
+  throw e;
+});
+
 server.listen(PORT, () => {
   console.log(`打开 http://localhost:${PORT}`);
 });
