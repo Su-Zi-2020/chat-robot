@@ -1,3 +1,25 @@
+
+<template>
+  <div class="app">
+    <header>最简对话 demo（无模型 · 无流式）</header>
+
+    <main ref="listEl">
+      <p v-if="!messages.length" class="empty">说点什么，后端会原样回显。</p>
+      <div
+        v-for="(m, i) in messages"
+        :key="i"
+        class="msg"
+        :class="m.role"
+      >{{ m.content }}</div>
+    </main>
+
+    <form @submit.prevent="send">
+      <input v-model="input" placeholder="说点什么…" autocomplete="off" :disabled="busy" />
+      <button :disabled="busy || !input.trim()">发送</button>
+    </form>
+  </div>
+</template>
+
 <script setup>
 import { nextTick, onMounted, ref } from 'vue';
 
@@ -56,23 +78,69 @@ onMounted(async () => {
 });
 </script>
 
-<template>
-  <div class="app">
-    <header>最简对话 demo（无模型 · 无流式）</header>
+<style scoped>
+.app {
+  max-width: 640px;
+  height: 100vh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
 
-    <main ref="listEl">
-      <p v-if="!messages.length" class="empty">说点什么，后端会原样回显。</p>
-      <div
-        v-for="(m, i) in messages"
-        :key="i"
-        class="msg"
-        :class="m.role"
-      >{{ m.content }}</div>
-    </main>
+header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #262b36;
+  font-weight: 600;
+}
 
-    <form @submit.prevent="send">
-      <input v-model="input" placeholder="说点什么…" autocomplete="off" :disabled="busy" />
-      <button :disabled="busy || !input.trim()">发送</button>
-    </form>
-  </div>
-</template>
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.empty { color: #8b93a5; text-align: center; margin-top: 40px; }
+
+.msg {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg.user { align-self: flex-end; background: #4c8dff; color: #fff; }
+.msg.assistant { align-self: flex-start; background: #171a21; border: 1px solid #262b36; }
+
+form {
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px 20px;
+  border-top: 1px solid #262b36;
+}
+
+input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #262b36;
+  background: #171a21;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+input:focus { border-color: #4c8dff; }
+
+button {
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: #4c8dff;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>

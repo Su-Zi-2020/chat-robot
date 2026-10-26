@@ -52,8 +52,8 @@ agent/
 │       ├── main.js         挂载 #app
 │       ├── App.vue         根组件：只放全局壳
 │       ├── views/
-│       │   └── ChatView.vue   聊天页（页面逻辑都在这里）
-│       └── style.css
+│       │   └── ChatView.vue   聊天页（模板 + 逻辑 + scoped 样式）
+│       └── style.css          全局样式（只有 reset 和 body）
 └── server/
     ├── package.json
     └── src/
