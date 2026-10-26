@@ -1,115 +1,66 @@
-# agent —— 聊天 AI（进行中）
+# 最简对话 demo
 
-当前只有后端核心 + 一个终端调试工具。最终形态是**网页能聊**，终端只是开发期工具。
+**没有大模型、没有流式、没有依赖。** 只有一个 Node 服务和一张页面：
+浏览器发一句话 → 后端回一句占位的话 → 显示出来。
+
+用来先把“前后端能通”这件事跑通，再往上加东西。
+
+## 跑起来
+
+```bash
+cd ~/code/agent
+node server/index.js
+# 打开 http://localhost:3000
+```
+
+改代码想自动重启：
+
+```bash
+node --watch server/index.js
+```
 
 ## 结构
 
 ```
 agent/
-├── server/
-│   ├── index.js            HTTP 入口：/api/chat (SSE)、托管 web/dist
-│   ├── llm.js              传输层：请求、SSE、UTF-8、超时、取消
-│   ├── session.js          会话层：消息历史、多轮
-│   └── config/config.js    key、端点、模型（已 gitignore）
-│
-├── web/                    Vite + React + TS
-│   ├── src/App.tsx         聊天界面
-│   ├── src/api.ts          读 SSE 流
-│   └── dist/               构建产物（server 托管）
-│
-├── tools/cli.mjs           终端工具（开发用，不部署）
-├── docs/api.md             前后端接口契约
-└── test.js                 早先的 readline demo（可删）
+├── server/index.js     76 行   HTTP 服务 + 假回复 + 静态托管
+├── public/index.html  136 行   页面（HTML + CSS + JS，无需构建）
+└── docs/api.md                 接口说明
 ```
 
-三层职责，严格单向依赖：
+没有 `npm install`，没有 `node_modules`，没有构建步骤。
 
-```
-tools/cli.mjs  →  server/session.js  →  server/llm.js  →  HTTP
-（读输入、写输出）  （历史、多轮）        （协议、流、错误）
-```
+## 现在有什么
 
-**约定：`llm.js` 不碰 stdin/stdout，`session.js` 不碰界面。** 将来 `server/index.js`
-调的就是 `session.send()`，和终端走同一条路。
-
-## 跑起来
-
-### 网页版（推荐）
-
-```bash
-# 1. 构建前端（只需一次，改前端后重跑）
-cd web && npm install && npm run build && cd ..
-
-# 2. 起服务：一个进程同时提供网页和接口
-node server/index.js
-# 打开 http://localhost:8787
-```
-
-### 开发模式（改代码自动生效）
-
-```bash
-# 终端 A：后端，改文件自动重启
-node --watch server/index.js
-
-# 终端 B：前端，改代码浏览器热更新
-cd web && npm run dev
-# 打开 http://localhost:5173（自动代理 /api 到 8787）
-```
-
-### 终端工具（后端快速验证）
-
-```bash
-node tools/cli.mjs
-```
-
-```
-模型 deepseek-chat  ·  端点 https://api.deepseek.com/v1  ·  流式
-输入内容回车发送；exit 退出；Ctrl-C 中止。
-
-你 > 我叫阿泽
-AI > 你好，阿泽
-你 > 我叫什么？
-AI > 阿泽            ← 多轮已生效
-```
-
-| 命令 | 说明 |
+| 功能 | 状态 |
 |---|---|
-| `node tools/cli.mjs` | 交互（多轮） |
-| `node tools/cli.mjs --no-stream` | 关流式 |
-| `echo "你好" \| node tools/cli.mjs` | 一次性，答完退出 |
-| `npm start` | 等价第一条 |
+| 发送消息、显示回复 | ✅ |
+| 空白输入校验（400） | ✅ |
+| 刷新页面恢复历史（内存里） | ✅ |
+| 大模型 | ❌ 占位回复 |
+| 流式输出 | ❌ 一次性返回 |
+| 持久化 | ❌ 重启就清空 |
 
-## 配置
+## 接口
 
-`server/config/config.js`：
-
-```js
-export const config = {
-  apiKey: 'sk-xxxx',
-  baseUrl: 'https://api.deepseek.com/v1',
-  model: 'deepseek-chat',
-};
+```http
+POST /api/chat
+{ "text": "你好" }
+→ { "reply": "我收到了：「你好」。这是一个占位回复……" }
 ```
 
-环境变量优先（部署时用，不改代码）：
+```http
+GET /api/messages
+→ { "messages": [{ "role": "user", "content": "…" }, …] }
+```
+
+## 完整版在哪
+
+这个仓库有两个分支：
 
 ```bash
-DEEPSEEK_API_KEY=sk-xxx API_MODEL=deepseek-chat node tools/cli.mjs
+git checkout main        # 完整版：接 DeepSeek、SSE 流式、React 前端、多轮会话
+git checkout minimal     # 当前：最简 demo
 ```
 
-任何 OpenAI 兼容端点都行：OpenAI / 硅基流动 / Ollama / vLLM。
-
-## 已验证
-
-- ✅ 流式、非流式（真实 key）
-- ✅ 多轮：问"我叫什么"能答出上一轮的名字，历史 4 条
-- ✅ 空输入：提示用法 + 退出码 1
-- ✅ 占位符守卫、假 key → 401 且带 `request_id`
-- ✅ 逐字节流：假服务器每 1 字节发一次，中文正确还原、无 `U+FFFD`
-- ❌ 超时分支、Ctrl-C/Ctrl-D 需要真终端，未实测
-
-## 下一步
-
-1. `server/index.js`：`POST /api/chat`（SSE），契约见 `docs/api.md`
-2. `web/`：Vite + React，一个聊天页
-3. 记忆：参考 `~/code/companion` 的 `agent/memory/`
+完整版的说明见那个分支里的 README。
