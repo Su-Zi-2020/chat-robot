@@ -56,8 +56,16 @@ agent/
 └── server/
     ├── package.json
     └── src/
-        ├── app.js          Express 路由 + 假回复
-        └── server.js       监听端口
+        ├── app.js          组装层：挂中间件和路由
+        ├── server.js       监听端口
+        ├── codes.js        业务码
+        ├── http.js         响应信封 ok / fail
+        ├── store.js        数据层（内存数组，将来换 SQLite）
+        ├── services/
+        │   └── reply.js    业务层（将来换真实模型）
+        └── routes/
+            ├── chat.js     POST /api/chat
+            └── messages.js POST /api/messages
 ```
 
 ## 现在有什么
