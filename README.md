@@ -78,10 +78,11 @@ agent/
 
 ## 分支
 
-```bash
-git checkout main       # 完整版：接 DeepSeek、SSE 流式、React 前端
-git checkout minimal    # 当前：Vue + Express，无模型
-```
+| 分支 | 内容 |
+|---|---|
+| `main` | 当前版本：Vue 3 + Express，无模型、无流式 |
+| `prototype-react` | 早期的完整原型：React + SSE 流式 + 接 DeepSeek（参考用） |
+
 
 ## 生产部署（以后）
 
