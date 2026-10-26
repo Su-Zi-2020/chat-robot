@@ -58,8 +58,7 @@ agent/
     └── src/
         ├── app.js          组装层：挂中间件和路由
         ├── server.js       监听端口
-        ├── codes.js        业务码
-        ├── http.js         响应信封 ok / fail
+        ├── http.js         业务码 + 响应信封（ok / fail）
         ├── services/
         │   └── reply.js    业务层（将来换真实模型）
         └── routes/

@@ -4,8 +4,7 @@
 import express from 'express';
 import chatRouter from './routes/chat.js';
 import messagesRouter from './routes/messages.js';
-import { fail } from './http.js';
-import { CODE } from './codes.js';
+import { fail, CODE } from './http.js';
 
 const app = express();
 
