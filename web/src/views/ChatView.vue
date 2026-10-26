@@ -14,7 +14,12 @@
     </main>
 
     <form @submit.prevent="send">
-      <input v-model="input" placeholder="说点什么…" autocomplete="off" :disabled="busy" />
+      <input
+        ref="inputEl"
+        v-model="input"
+        placeholder="说点什么…"
+        autocomplete="off"
+      />
       <button :disabled="busy || !input.trim()">发送</button>
     </form>
   </div>
@@ -27,6 +32,7 @@ const messages = ref([]);
 const input = ref('');
 const busy = ref(false);
 const listEl = ref(null);
+const inputEl = ref(null);
 
 function scrollToBottom() {
   const el = listEl.value;
@@ -68,6 +74,7 @@ async function send() {
     busy.value = false;
     await nextTick();
     scrollToBottom();
+    inputEl.value?.focus();   // 光标回到输入框，可以接着打
   }
 }
 
@@ -75,6 +82,7 @@ onMounted(async () => {
   await loadHistory();
   await nextTick();
   scrollToBottom();
+  inputEl.value?.focus();
 });
 </script>
 
