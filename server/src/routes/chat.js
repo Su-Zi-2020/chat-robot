@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import { ok, fail } from '../http.js';
 import { CODE } from '../codes.js';
-import { appendExchange } from '../store.js';
+import { appendExchange } from './store.js';
 import { generateReply } from '../services/reply.js';
 
 const MAX_TEXT = 2000;

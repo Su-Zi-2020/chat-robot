@@ -60,12 +60,12 @@ agent/
         ├── server.js       监听端口
         ├── codes.js        业务码
         ├── http.js         响应信封 ok / fail
-        ├── store.js        数据层（内存数组，将来换 SQLite）
         ├── services/
         │   └── reply.js    业务层（将来换真实模型）
         └── routes/
             ├── chat.js     POST /api/chat
-            └── messages.js POST /api/messages
+            ├── messages.js POST /api/messages
+            └── store.js    临时内存存储（接 SQLite 时整个删掉）
 ```
 
 ## 现在有什么
