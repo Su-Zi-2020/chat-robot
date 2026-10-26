@@ -63,8 +63,7 @@ agent/
         │   └── reply.js    业务层（将来换真实模型）
         └── routes/
             ├── chat.js     POST /api/chat
-            ├── messages.js POST /api/messages
-            └── store.js    临时内存存储（接 SQLite 时整个删掉）
+            └── messages.js POST /api/messages（临时内存存储也在这里）
 ```
 
 ## 现在有什么

@@ -1,7 +1,7 @@
 // POST /api/chat —— 发一句话，拿回一条回复。
 import { Router } from 'express';
 import { success, fail, CODE } from '../http.js';
-import { appendExchange } from './store.js';
+import { appendExchange } from './messages.js';
 import { generateReply } from '../services/reply.js';
 
 const MAX_TEXT = 2000;
