@@ -7,3 +7,15 @@ import ChatView from './views/ChatView.vue';
 <template>
   <ChatView />
 </template>
+
+<!-- 全局样式：不加 scoped，所以对所有页面生效。只放 reset 和 body 这类东西。 -->
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #0f1115;
+  color: #e6e8ee;
+  font: 15px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+</style>

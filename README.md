@@ -50,10 +50,9 @@ agent/
 │   ├── vite.config.js      proxy: /api → localhost:3100
 │   └── src/
 │       ├── main.js         挂载 #app
-│       ├── App.vue         根组件：只放全局壳
-│       ├── views/
-│       │   └── ChatView.vue   聊天页（模板 + 逻辑 + scoped 样式）
-│       └── style.css          全局样式（只有 reset 和 body）
+│       ├── App.vue         根组件：全局壳 + 全局样式
+│       └── views/
+│           └── ChatView.vue   聊天页（模板 + 逻辑 + scoped 样式）
 └── server/
     ├── package.json
     └── src/
