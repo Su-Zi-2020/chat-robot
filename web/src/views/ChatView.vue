@@ -41,9 +41,14 @@ function scrollToBottom() {
 
 async function loadHistory() {
   try {
-    const res = await fetch('/api/messages');
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
     const data = await res.json();
-    messages.value = data.messages ?? [];
+    if (data.code !== 0) throw new Error(data.message);
+    messages.value = data.data.messages ?? [];
   } catch {
     // 后端没起来时静默失败，页面上直接发消息会报错提示
   }
@@ -66,8 +71,8 @@ async function send() {
       body: JSON.stringify({ text }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '请求失败');
-    messages.value.push({ role: 'assistant', content: data.reply });
+    if (data.code !== 0) throw new Error(data.message || '请求失败');
+    messages.value.push({ role: 'assistant', content: data.data.reply });
   } catch (e) {
     messages.value.push({ role: 'assistant', content: `出错：${e.message}` });
   } finally {
