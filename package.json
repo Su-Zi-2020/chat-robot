@@ -1,0 +1,10 @@
+{
+  "name": "agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node tools/cli.mjs",
+    "cli": "node tools/cli.mjs",
+    "cli:nostream": "node tools/cli.mjs --no-stream"
+  }
+}
