@@ -8,6 +8,7 @@ import { parseCookies, setCookie, clearCookie } from '../cookies.js';
 import usersDAO from '../dao/users.dao.js';
 import sessionsDAO from '../dao/sessions.dao.js';
 import { SESSION_COOKIE } from '../middleware/auth.js';
+import { requestJson } from '../http-client.js';
 
 const STATE_COOKIE = 'oauth_state';
 const SESSION_TTL = 30 * 24 * 3600 * 1000;
@@ -48,7 +49,7 @@ router.get('/github/callback', async (req, res) => {
 
     try {
         // 用 code 换 access_token（服务端到服务端，不经过浏览器）
-        const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+        const tokenRes = await requestJson('https://github.com/login/oauth/access_token', {
             method: 'POST',
             headers: { accept: 'application/json', 'content-type': 'application/json' },
             body: JSON.stringify({
@@ -58,18 +59,20 @@ router.get('/github/callback', async (req, res) => {
                 redirect_uri: config.github.callbackUrl,
             }),
         });
-        const tokenData = await tokenRes.json();
+        const tokenData = tokenRes.json ?? {};
         if (!tokenData.access_token) {
             return fail(res, 502, CODE.UPSTREAM, `GitHub 换取 token 失败：${tokenData.error ?? 'unknown'}`);
         }
 
         // 用 token 拉用户资料（这里只需要 id / login / avatar）
-        const userRes = await fetch('https://api.github.com/user', {
+        const userRes = await requestJson('https://api.github.com/user', {
             headers: { authorization: `Bearer ${tokenData.access_token}`, 'user-agent': 'chat-robot' },
         });
-        if (!userRes.ok) return fail(res, 502, CODE.UPSTREAM, `GitHub 用户接口失败：HTTP ${userRes.status}`);
+        if (userRes.status !== 200) {
+            return fail(res, 502, CODE.UPSTREAM, `GitHub 用户接口失败：HTTP ${userRes.status}`);
+        }
 
-        const gh = await userRes.json();
+        const gh = userRes.json;
         const user = usersDAO.upsertFromGithub({
             githubId: gh.id, // 稳定标识，永久不变
             login: gh.login,
