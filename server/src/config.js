@@ -14,7 +14,13 @@ export const config = {
     apiKey: process.env.DEEPSEEK_API_KEY ?? fileConfig.apiKey ?? '',
     baseUrl: (process.env.API_BASE_URL ?? fileConfig.baseUrl ?? 'https://api.deepseek.com/v1').replace(/\/+$/, ''), // 去掉结尾斜杠，拼路径不会出现 //
     model: process.env.API_MODEL ?? fileConfig.model ?? 'deepseek-chat',
-    maxHistory: Number(process.env.MAX_HISTORY ?? 20), // 发给模型的最近消息条数，控制 token 成本
+    context: {
+        maxInputTokens: Number(process.env.MAX_INPUT_TOKENS ?? 6000), // 每次请求输入上限
+        recentMessages: Number(process.env.RECENT_MESSAGES ?? 12), // 无论如何保留的原文条数
+        compactTriggerTokens: Number(process.env.COMPACT_TRIGGER_TOKENS ?? 4000), // 未摘要历史超过它就压缩
+        summaryMaxTokens: Number(process.env.SUMMARY_MAX_TOKENS ?? 400), // 摘要输出上限
+        minCompactGapMessages: Number(process.env.MIN_COMPACT_GAP ?? 12), // 两次压缩至少隔多少条消息
+    },
 
     // GitHub OAuth（登录用）
     github: {

@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import { fail, CODE } from '../http.js';
 import messagesDAO from '../dao/messages.dao.js';
+import { buildContext, compactIfNeeded } from '../services/context.js';
 import { streamModel, UpstreamError } from '../services/llm.js';
 import { config } from '../config.js';
 import { requireUser } from '../middleware/auth.js';
@@ -25,11 +26,8 @@ router.post('/', requireUser, async (req, res) => { // 主流程：校验 → �
         return fail(res, 400, CODE.BAD_PARAM, `text 过长（上限 ${MAX_TEXT} 字）`);
     }
 
-    // 带上最近若干条历史，让模型有上下文（只取尾部，控制 token）
-    // 只取 role/content：id、createdAt 是我们自己的字段，不要发给模型
-    const history = messagesDAO
-        .listRecent(config.maxHistory, req.user.id)
-        .map(({ role, content }) => ({ role, content }));
+    // 装配上下文：摘要 + 最近原文（按 token 预算裁剪，见 services/context.js）
+    const history = buildContext(req.user.id);
     const messages = [...history, { role: 'user', content: text }];
 
     // 客户端断开（关页面 / 取消）时中断上游请求，避免白烧 token
@@ -83,6 +81,9 @@ router.post('/', requireUser, async (req, res) => { // 主流程：校验 → �
             // done 帧已经发出去了，改不了响应；只能记日志，避免"用户以为存了其实没存"
             console.error('[chat] 写入历史失败:', e.message);
         }
+
+        // 异步压缩：不阻塞这次回复，失败也只记日志（下次再压）
+        compactIfNeeded(req.user.id).catch((e) => console.error('[context] 压缩失败:', e.message));
     } catch (e) {
         if (controller.signal.aborted) {
             // 客户端主动断开：不写历史，安静结束

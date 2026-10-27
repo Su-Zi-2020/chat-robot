@@ -72,3 +72,25 @@ export async function* streamModel({ messages, signal }) {
         }
     }
 }
+
+
+/**
+ * 非流式调用（摘要等内部任务用）。不走 SSE，一次性拿结果。
+ * @returns {Promise<string>}
+ */
+export async function complete({ messages, maxTokens = 800, signal }) {
+    if (!config.apiKey) throw new UpstreamError('服务端没有配置 API key', 500);
+
+    const res = await fetch(`${config.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${config.apiKey}` },
+        body: JSON.stringify({ model: config.model, messages, max_tokens: maxTokens, temperature: 0.3 }),
+        signal,
+    });
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new UpstreamError(`摘要请求失败 HTTP ${res.status}：${body.slice(0, 200)}`, 502);
+    }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() ?? '';
+}

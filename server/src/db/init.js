@@ -71,4 +71,14 @@ if (needsRebuild) {
 
 db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_user ON messages (user_id, id);`);
 
-console.log('messages / users / sessions 表已就绪');
+// 每个用户的上下文状态：滚动摘要 + 已压到哪个消息 id
+db.exec(`
+    CREATE TABLE IF NOT EXISTS conversation_state (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        summary TEXT NOT NULL DEFAULT '',        -- 滚动摘要（更早对话的压缩版）
+        summary_until_id INTEGER NOT NULL DEFAULT 0, -- 摘要覆盖到的最大 message id
+        updated_at INTEGER NOT NULL
+    );
+`);
+
+console.log('messages / users / sessions / conversation_state 表已就绪');
