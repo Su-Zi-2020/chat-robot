@@ -4,12 +4,17 @@
 import express from 'express';
 import chatRouter from './routes/chat.js';
 import messagesRouter from './routes/messages.js';
+import authRouter from './routes/auth.js';
+import { attachUser } from './middleware/auth.js';
 import { fail, CODE } from './http.js';
 
 const app = express();
 
 app.use(express.json({ limit: '100kb' })); // 解析 JSON 请求体，超限交给下面的错误处理
 
+app.use(attachUser); // 先解析登录态，后面所有路由都能用 req.user
+
+app.use('/api/auth', authRouter); // 登录 / 回调 / 我是谁 / 登出
 app.use('/api/chat', chatRouter); // 聊天（流式）
 app.use('/api/messages', messagesRouter); // 取历史
 

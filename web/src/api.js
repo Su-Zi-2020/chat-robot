@@ -72,3 +72,15 @@ export async function streamChat({ text, onDelta, signal }) { // 流式对话：
     }
     return full;
 }
+
+/** 当前登录用户；未登录返回 null */
+export async function fetchMe() {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json().catch(() => null);
+    return data?.data?.user ?? null;
+}
+
+/** 退出登录 */
+export async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+}

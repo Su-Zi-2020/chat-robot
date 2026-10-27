@@ -6,8 +6,8 @@ import messagesDAO from '../dao/messages.dao.js';
 
 const router = Router();
 
-router.post('/', (_req, res) => { // 直接查库返回
-    success(res, { messages: messagesDAO.listAll() });
+router.post('/', (req, res) => { // 直接查库返回
+    success(res, { messages: messagesDAO.listAll(req.user?.id ?? null) });
 });
 
 export default router;

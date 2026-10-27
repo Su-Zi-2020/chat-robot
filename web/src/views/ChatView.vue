@@ -1,6 +1,16 @@
 <template>
     <div class="app">
-        <header>DeepSeek 流式对话</header>
+        <header>
+            <span>DeepSeek 流式对话</span>
+            <span class="account">
+                <template v-if="user">
+                    <img v-if="user.avatar" :src="user.avatar" class="avatar" alt="" />
+                    <span class="name">{{ user.login }}</span>
+                    <button class="link" @click="doLogout">退出</button>
+                </template>
+                <a v-else class="link" href="/api/auth/github">用 GitHub 登录</a>
+            </span>
+        </header>
 
         <main ref="listEl">
             <!-- 空状态：一条消息都没有时显示 -->
@@ -24,13 +34,14 @@
 
 <script setup>
 import { nextTick, onMounted, ref } from 'vue';
-import { fetchMessages, streamChat } from '../api';
+import { fetchMessages, fetchMe, logout, streamChat } from '../api';
 
 const messages = ref([]); // 消息列表：{ role, content }
 const input = ref(''); // 输入框内容
 const streaming = ref(false); // 是否正在接收流式回复
 const listEl = ref(null); // 消息列表 DOM，用于滚动
 const inputEl = ref(null); // 输入框 DOM，用于聚焦
+const user = ref(null); // 当前登录用户，null = 未登录
 
 function scrollToBottom() { // 滚到底部（发消息、收到增量、加载完成后调用）
     const el = listEl.value;
@@ -79,7 +90,15 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
     }
 }
 
-onMounted(async () => { // 首次进入：加载历史 → 滚到底 → 聚焦输入框
+async function doLogout() { // 退出后回到匿名历史
+    await logout();
+    user.value = null;
+    messages.value = [];
+    await loadHistory();
+}
+
+onMounted(async () => { // 首次进入：查登录态 → 加载历史 → 滚到底 → 聚焦输入框
+    user.value = await fetchMe();
     await loadHistory();
     await nextTick();
     scrollToBottom();
@@ -100,6 +119,34 @@ header {
     padding: 16px 20px;
     border-bottom: 1px solid #262b36;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.account {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 400;
+    font-size: 13px;
+    color: #8b93a5;
+}
+
+.avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+}
+
+.link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #4c8dff;
+    cursor: pointer;
+    font: inherit;
+    text-decoration: none;
 }
 
 main {

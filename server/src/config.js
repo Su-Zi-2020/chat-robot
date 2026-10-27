@@ -15,4 +15,14 @@ export const config = {
     baseUrl: (process.env.API_BASE_URL ?? fileConfig.baseUrl ?? 'https://api.deepseek.com/v1').replace(/\/+$/, ''), // 去掉结尾斜杠，拼路径不会出现 //
     model: process.env.API_MODEL ?? fileConfig.model ?? 'deepseek-chat',
     maxHistory: Number(process.env.MAX_HISTORY ?? 20), // 发给模型的最近消息条数，控制 token 成本
+
+    // GitHub OAuth（登录用）
+    github: {
+        clientId: process.env.GITHUB_CLIENT_ID ?? fileConfig.github?.clientId ?? '',
+        clientSecret: process.env.GITHUB_CLIENT_SECRET ?? fileConfig.github?.clientSecret ?? '',
+        // 必须和 GitHub OAuth App 里登记的 Redirect URI 完全一致
+        callbackUrl: process.env.GITHUB_CALLBACK_URL
+            ?? fileConfig.github?.callbackUrl
+            ?? 'http://localhost:5173/api/auth/github/callback',
+    },
 };
