@@ -46,7 +46,7 @@ export async function streamChat({ text, onDelta, signal }) { // 流式对话：
     let buf = ''; // 帧层缓冲：一行可能跨多个 chunk
     let full = ''; // 累积完整回复
 
-    for (;;) {
+    while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
