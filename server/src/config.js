@@ -20,6 +20,7 @@ export const config = {
         compactTriggerTokens: Number(process.env.COMPACT_TRIGGER_TOKENS ?? 4000), // 未摘要历史超过它就压缩
         summaryMaxTokens: Number(process.env.SUMMARY_MAX_TOKENS ?? 400), // 摘要输出上限
         minCompactGapMessages: Number(process.env.MIN_COMPACT_GAP ?? 12), // 两次压缩至少隔多少条消息
+        maxMessageChars: Number(process.env.MAX_MESSAGE_CHARS ?? 2000), // 单条历史消息上限（超出截断首尾保留）
     },
 
     // GitHub OAuth（登录用）

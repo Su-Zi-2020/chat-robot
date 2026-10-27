@@ -8,6 +8,22 @@ import { complete } from './llm.js';
 
 const C = config.context;
 
+// 单条消息过长时截断：保留开头和结尾（信息通常在首尾），中间省略。
+// 只作用于历史消息，不影响新输入（新输入由路由校验）。
+function clipMessage(content) {
+    const limit = C.maxMessageChars;
+    const chars = [...content];
+    if (chars.length <= limit) return content;
+
+    const head = Math.floor(limit * 0.6);
+    const tail = limit - head;
+    return (
+        chars.slice(0, head).join('') +
+        `\n…（中间省略 ${chars.length - limit} 字）…\n` +
+        chars.slice(-tail).join('')
+    );
+}
+
 // ---------- 读：摘要状态 ----------
 function getState(userId) { // 没有记录时返回空摘要
     const db = getDatabase();
@@ -47,7 +63,7 @@ export function buildContext(userId) {
         used = estimateMessages(parts) + estimateMessages(recent);
     }
 
-    return [...parts, ...recent.map(({ role, content }) => ({ role, content }))];
+    return [...parts, ...recent.map(({ role, content }) => ({ role, content: clipMessage(content) }))];
 }
 
 // ---------- 写：滚动摘要 ----------

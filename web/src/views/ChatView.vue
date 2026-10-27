@@ -32,7 +32,14 @@
         </main>
 
         <form v-if="user" @submit.prevent="send">
-            <input ref="inputEl" v-model="input" placeholder="说点什么…" autocomplete="off" />
+            <input
+                ref="inputEl"
+                v-model="input"
+                placeholder="说点什么…"
+                autocomplete="off"
+                maxlength="2000"
+            />
+            <span v-if="input.length > 1800" class="counter">{{ input.length }}/2000</span>
             <button :disabled="streaming || !input.trim()">发送</button>
         </form>
     </div>
@@ -273,5 +280,12 @@ button {
 button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}
+
+.counter {
+    align-self: center;
+    color: #8b93a5;
+    font-size: 12px;
+    white-space: nowrap;
 }
 </style>
