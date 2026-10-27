@@ -1,8 +1,9 @@
-// 模型调用层：把 OpenAI 兼容接口的 SSE 流，变成一个异步生成器。
-// 上层（路由）只管 for await 拿 delta，不用关心 HTTP 细节。
+// 模型调用层：把 OpenAI 兼容接口的 SSE 流，包成一个异步生成器。
+// 上层（路由）只需要 for await 拿 delta，不用关心 HTTP 细节。
 
 import { config } from '../config.js';
 
+// 上游（模型服务）出错时抛这个，路由据此返回 502 + code 2001
 export class UpstreamError extends Error {
     constructor(message, status) {
         super(message);
@@ -11,12 +12,12 @@ export class UpstreamError extends Error {
 }
 
 /**
-  * 流式调用模型。
-  * @param {object} opts
-  * @param {Array<{role:string, content:string}>} opts.messages
-  * @param {AbortSignal} [opts.signal]
-  * @yields {string} 增量文本
-  */
+ * 流式调用模型，逐段产出文本。
+ * @param {object} opts
+ * @param {Array<{role:string, content:string}>} opts.messages 完整上下文（含本轮用户消息）
+ * @param {AbortSignal} [opts.signal] 外部取消信号（客户端断开时中断上游）
+ * @yields {string} 增量文本
+ */
 export async function* streamModel({ messages, signal }) {
     if (!config.apiKey) {
         throw new UpstreamError('服务端没有配置 API key（环境变量 DEEPSEEK_API_KEY 或 server/config/config.js）', 500);
@@ -34,7 +35,7 @@ export async function* streamModel({ messages, signal }) {
             signal,
         });
     } catch (e) {
-        if (e.name === 'AbortError') throw e;
+        if (e.name === 'AbortError') throw e; // 主动取消，交给上层忽略
         throw new UpstreamError(`连不上模型服务：${e.message}`, 502);
     }
 
@@ -43,26 +44,30 @@ export async function* streamModel({ messages, signal }) {
         throw new UpstreamError(`模型返回 HTTP ${res.status}：${body.slice(0, 200)}`, 502);
     }
 
-    // 两层缓冲：字节层（中文不被切坏）+ 帧层（JSON 不被切坏）
+    // 两层缓冲，缺一不可：
+    // 字节层 —— 中文可能被网络切成两半，TextDecoder 的 stream 会暂存不完整字节
+    // 帧层   —— 一行 SSE 可能跨多个 chunk，按 \n 切完剩下的留回 buf
     let buf = '';
     const decoder = new TextDecoder();
 
     for await (const chunk of res.body) {
         buf += decoder.decode(chunk, { stream: true });
+
         let nl;
         while ((nl = buf.indexOf('\n')) !== -1) {
             const line = buf.slice(0, nl).trim();
             buf = buf.slice(nl + 1);
-            if (!line.startsWith('data:')) continue;
+
+            if (!line.startsWith('data:')) continue; // 心跳行、空行
 
             const data = line.slice(5).trim();
-            if (data === '[DONE]') return;
+            if (data === '[DONE]') return; // OpenAI 约定的结束标记
 
             try {
                 const delta = JSON.parse(data).choices?.[0]?.delta?.content;
-                if (delta) yield delta;
+                if (delta) yield delta; // 只产出正文增量
             } catch {
-                // 心跳行 / 非 JSON 行
+                // 非 JSON 行（部分网关会插注释），跳过
             }
         }
     }

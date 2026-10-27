@@ -5,22 +5,20 @@
 import { Router } from 'express';
 import { success } from '../http.js';
 
-const messages = [];
+const messages = []; // 临时存储：进程重启即清空
 
-/** 取出全部历史（返回引用，调用方不要改） */
-export function listMessages() {
+export function listMessages() { // 取出全部历史（返回引用，调用方不要改）
     return messages;
 }
 
-/** 一问一答成对写入，保证不会出现"有问无答" */
-export function appendExchange(userText, assistantText) {
+export function appendExchange(userText, assistantText) { // 一问一答成对写入，保证不会出现"有问无答"
     messages.push({ role: 'user', content: userText });
     messages.push({ role: 'assistant', content: assistantText });
 }
 
 const router = Router();
 
-router.post('/', (_req, res) => {
+router.post('/', (_req, res) => { // 直接返回内存里的数组
     success(res, { messages: listMessages() });
 });
 

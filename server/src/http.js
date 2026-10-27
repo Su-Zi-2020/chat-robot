@@ -1,7 +1,7 @@
 // 接口层的公共约定：业务码 + 统一响应信封。
 // 所有路由和 app.js 都用这里，所以单独一个文件；再拆成两个就太碎了。
 
-// 业务码：0 成功；1xxx 请求/参数问题；5xxx 服务问题
+// 业务码：0 成功；1xxx 请求/参数问题；2xxx 上游依赖；5xxx 服务自身
 export const CODE = {
     SUCCESS: 0, // 成功
     BAD_PARAM: 1001, // 参数错误：缺字段、类型不对、空值、超长
@@ -12,10 +12,10 @@ export const CODE = {
     INTERNAL: 5000, // 服务内部错误（未捕获异常）
 };
 
-// 成功：固定 200
+// 成功响应：固定 HTTP 200 + 信封
 export const success = (res, data = null) =>
     res.status(200).json({ code: CODE.SUCCESS, message: 'success', data });
 
-// 失败：真实状态码 + 信封（httpStatus 与 code 一一对应）
+// 失败响应：真实状态码 + 信封（httpStatus 与 code 一一对应，见 docs/api.md）
 export const fail = (res, httpStatus, code, message) =>
     res.status(httpStatus).json({ code, message });

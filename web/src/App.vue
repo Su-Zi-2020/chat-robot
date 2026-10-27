@@ -10,7 +10,9 @@ import ChatView from './views/ChatView.vue';
 
 <!-- 全局样式：不加 scoped，所以对所有页面生效。只放 reset 和 body 这类东西。 -->
 <style>
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
 body {
     margin: 0;

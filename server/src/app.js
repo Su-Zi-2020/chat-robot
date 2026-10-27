@@ -8,15 +8,15 @@ import { fail, CODE } from './http.js';
 
 const app = express();
 
-app.use(express.json({ limit: '100kb' }));
+app.use(express.json({ limit: '100kb' })); // 解析 JSON 请求体，超限交给下面的错误处理
 
-app.use('/api/chat', chatRouter);
-app.use('/api/messages', messagesRouter);
+app.use('/api/chat', chatRouter); // 聊天（流式）
+app.use('/api/messages', messagesRouter); // 取历史
 
-// 未知接口
+// 兜底：未知接口
 app.use((_req, res) => fail(res, 404, CODE.NOT_FOUND, '接口不存在'));
 
-// 任何异常都收敛成信封，不漏 HTML
+// 兜底：任何异常都收敛成 JSON 信封，不把 Express 默认的 HTML 错误页漏出去
 app.use((err, _req, res, _next) => {
     if (err?.type === 'entity.parse.failed') return fail(res, 400, CODE.BAD_JSON, '请求体不是合法 JSON');
     if (err?.type === 'entity.too.large') return fail(res, 413, CODE.TOO_LARGE, '请求体过大');
