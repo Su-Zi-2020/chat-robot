@@ -37,6 +37,15 @@ npm run db:init     # 首次运行：建表（可重复执行）
 npm start
 ```
 
+| 命令 | 作用 |
+|---|---|
+| `npm run db:init` | 建表 / 补列（可重复执行） |
+| `npm run db:tables` | 终端里看表名、行数、最近 5 条消息 |
+| `npm run db:reset` | 删库重建（清空所有历史和用户） |
+
+也可以用 VS Code 插件 **SQLite Viewer**（`qwtel.sqlite-viewer`）直接点开 `server/data/agent.db`。
+注意库是 WAL 模式：服务运行时新写入可能要 checkpoint 后才可见（停掉服务再看最稳）。
+
 - 连接配置：`src/config/database.js`（WAL、busy_timeout）
 - SQL 全在 `src/dao/messages.dao.js`
 - 换库只改这两个文件
