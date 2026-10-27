@@ -5,15 +5,27 @@
 
 ## 参数
 
+参数集中在 `server/src/config/context.js`，全部支持环境变量覆盖。
+
 | 配置项 | 环境变量 | 默认值 | 含义 |
 |---|---|---|---|
-| `context.maxInputTokens` | `MAX_INPUT_TOKENS` | 6000 | 每次请求输入上限（token） |
-| `context.recentMessages` | `RECENT_MESSAGES` | 12 | 无论如何保留的原文条数 |
-| `context.compactTriggerTokens` | `COMPACT_TRIGGER_TOKENS` | 4000 | 未摘要历史超过它就压缩 |
-| `context.summaryMaxTokens` | `SUMMARY_MAX_TOKENS` | 400 | 摘要输出上限 |
-| `context.minCompactGapMessages` | `MIN_COMPACT_GAP` | 12 | 两次压缩至少间隔多少条消息 |
+| `maxInputTokens` | `MAX_INPUT_TOKENS` | **24000** | 每次请求输入上限（token） |
+| `recentMessages` | `RECENT_MESSAGES` | **24** | 压缩时保留原文的条数（不参与摘要） |
+| `compactTriggerTokens` | `COMPACT_TRIGGER_TOKENS` | **18000** | 未摘要历史超过它就压缩 |
+| `summaryMaxTokens` | `SUMMARY_MAX_TOKENS` | **800** | 摘要输出上限 |
+| `minCompactGapMessages` | `MIN_COMPACT_GAP` | **24** | 两次压缩至少间隔多少条消息 |
+| `maxMessageChars` | `MAX_MESSAGE_CHARS` | **2000** | 单条历史消息字符上限 |
 
-自建部署（自己付 token）用 6000；BYOK（用户自带 key）可调到 12000。
+**关键不变量**：
+
+```
+maxInputTokens > compactTriggerTokens + summaryMaxTokens + 保留区
+24000          > 18000              + 800              + ~1440      ✅
+```
+
+启动时会校验这个不变量，破坏时打警告（否则会出现"未摘要就被裁掉"的消息）。
+
+容量参考：24000 token ≈ 3.6 万汉字 ≈ 240 轮短对话。
 
 ## 装配 `buildContext(userId)`
 
