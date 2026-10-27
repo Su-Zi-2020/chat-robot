@@ -18,10 +18,21 @@ export class UpstreamError extends Error {
  * @param {AbortSignal} [opts.signal] 外部取消信号（客户端断开时中断上游）
  * @yields {string} 增量文本
  */
-export async function* streamModel({ messages, signal }) {
+const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS ?? 60_000);
+
+// 组合"外部取消"和"超时"：客户端断开、或上游挂起，都要能中断
+function withTimeout(signal) {
+    const timeout = AbortSignal.timeout(TIMEOUT_MS);
+    if (!signal) return { signal: timeout, isTimeout: () => timeout.aborted };
+    return { signal: AbortSignal.any([signal, timeout]), isTimeout: () => timeout.aborted };
+}
+
+export async function* streamModel({ messages, signal: outerSignal }) {
     if (!config.apiKey) {
         throw new UpstreamError('服务端没有配置 API key（环境变量 DEEPSEEK_API_KEY 或 server/config/config.js）', 500);
     }
+
+    const { signal, isTimeout } = withTimeout(outerSignal);
 
     let res;
     try {
@@ -35,7 +46,8 @@ export async function* streamModel({ messages, signal }) {
             signal,
         });
     } catch (e) {
-        if (e.name === 'AbortError') throw e; // 主动取消，交给上层忽略
+        if (isTimeout()) throw new UpstreamError(`模型响应超时（${TIMEOUT_MS / 1000}s）`, 504);
+        if (e.name === 'AbortError') throw e; // 客户端主动取消，交给上层忽略
         throw new UpstreamError(`连不上模型服务：${e.message}`, 502);
     }
 
@@ -78,15 +90,24 @@ export async function* streamModel({ messages, signal }) {
  * 非流式调用（摘要等内部任务用）。不走 SSE，一次性拿结果。
  * @returns {Promise<string>}
  */
-export async function complete({ messages, maxTokens = 800, signal }) {
+export async function complete({ messages, maxTokens = 800, signal: outerSignal }) {
     if (!config.apiKey) throw new UpstreamError('服务端没有配置 API key', 500);
 
-    const res = await fetch(`${config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${config.apiKey}` },
-        body: JSON.stringify({ model: config.model, messages, max_tokens: maxTokens, temperature: 0.3 }),
-        signal,
-    });
+    const { signal, isTimeout } = withTimeout(outerSignal);
+
+    let res;
+    try {
+        res = await fetch(`${config.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${config.apiKey}` },
+            body: JSON.stringify({ model: config.model, messages, max_tokens: maxTokens, temperature: 0.3 }),
+            signal,
+        });
+    } catch (e) {
+        if (isTimeout()) throw new UpstreamError(`摘要请求超时（${TIMEOUT_MS / 1000}s）`, 504);
+        if (e.name === 'AbortError') throw e;
+        throw new UpstreamError(`摘要请求失败：${e.message}`, 502);
+    }
     if (!res.ok) {
         const body = await res.text().catch(() => '');
         throw new UpstreamError(`摘要请求失败 HTTP ${res.status}：${body.slice(0, 200)}`, 502);

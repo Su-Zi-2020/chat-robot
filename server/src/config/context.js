@@ -28,7 +28,7 @@ const reserveEstimate = contextConfig.summaryMaxTokens + contextConfig.recentMes
 if (contextConfig.maxInputTokens <= contextConfig.compactTriggerTokens + reserveEstimate) {
     console.warn(
         `[config] 上下文预算偏小：maxInputTokens=${contextConfig.maxInputTokens} ` +
-            `<= compactTrigger=${contextConfig.compactTriggerTokens} + 保留区估算=${reserveEstimate}。` +
-            '可能出现未摘要的历史被裁掉。',
+        `<= compactTrigger=${contextConfig.compactTriggerTokens} + 保留区估算=${reserveEstimate}。` +
+        '可能出现未摘要的历史被裁掉。',
     );
 }

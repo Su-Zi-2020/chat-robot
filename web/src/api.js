@@ -19,6 +19,18 @@ async function readJson(res) {
     return res.json().catch(() => null);
 }
 
+/** 取公开配置（输入上限等），失败返回默认值 */
+export async function fetchConfig() {
+    try {
+        const res = await fetch('/api/config', { method: 'POST', headers: JSON_HEADERS, body: '{}' });
+        const body = await readJson(res);
+        if (body?.code === 0) return body.data;
+    } catch {
+        // 后端没起来时用默认值
+    }
+    return { maxInputChars: 2000 };
+}
+
 /** 取历史消息 */
 export async function fetchMessages() { // 拉取当前用户的全部历史
     const res = await fetch('/api/messages', {

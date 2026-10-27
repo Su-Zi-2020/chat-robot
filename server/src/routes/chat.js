@@ -6,10 +6,8 @@ import { fail, CODE } from '../http.js';
 import messagesDAO from '../dao/messages.dao.js';
 import { buildContext, compactIfNeeded } from '../services/context.js';
 import { streamModel, UpstreamError } from '../services/llm.js';
-import { config } from '../config.js';
 import { requireUser } from '../middleware/auth.js';
-
-const MAX_TEXT = 2000; // 单条输入上限，和前端 PRD 一致
+import { config } from '../config.js';
 
 const router = Router();
 
@@ -22,8 +20,8 @@ router.post('/', requireUser, async (req, res) => { // 主流程：校验 → �
 
     const text = raw.trim();
     if (!text) return fail(res, 400, CODE.BAD_PARAM, 'text 不能为空');
-    if ([...text].length > MAX_TEXT) {
-        return fail(res, 400, CODE.BAD_PARAM, `text 过长（上限 ${MAX_TEXT} 字）`);
+    if ([...text].length > config.context.maxMessageChars) {
+        return fail(res, 400, CODE.BAD_PARAM, `text 过长（上限 ${config.context.maxMessageChars} 字）`);
     }
 
     // 装配上下文：摘要 + 最近原文（按 token 预算裁剪，见 services/context.js）

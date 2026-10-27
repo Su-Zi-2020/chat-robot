@@ -37,9 +37,9 @@
                 v-model="input"
                 placeholder="说点什么…"
                 autocomplete="off"
-                maxlength="2000"
+                :maxlength="maxInputChars"
             />
-            <span v-if="input.length > 1800" class="counter">{{ input.length }}/2000</span>
+            <span v-if="input.length > maxInputChars - 200" class="counter">{{ input.length }}/{{ maxInputChars }}</span>
             <button :disabled="streaming || !input.trim()">发送</button>
         </form>
     </div>
@@ -47,7 +47,7 @@
 
 <script setup>
 import { nextTick, onMounted, ref } from 'vue';
-import { ApiError, fetchMessages, fetchMe, logout, streamChat } from '../api';
+import { ApiError, fetchConfig, fetchMessages, fetchMe, logout, streamChat } from '../api';
 
 const messages = ref([]); // 消息列表：{ role, content }
 const input = ref(''); // 输入框内容
@@ -55,6 +55,7 @@ const streaming = ref(false); // 是否正在接收流式回复
 const listEl = ref(null); // 消息列表 DOM，用于滚动
 const inputEl = ref(null); // 输入框 DOM，用于聚焦
 const user = ref(null); // 当前登录用户，null = 未登录
+const maxInputChars = ref(2000); // 单条输入上限，从后端配置读
 
 function scrollToBottom() { // 滚到底部（发消息、收到增量、加载完成后调用）
     const el = listEl.value;
@@ -114,7 +115,10 @@ async function doLogout() { // 退出：清服务端 session + 清空界面，�
     messages.value = [];
 }
 
-onMounted(async () => { // 首次进入：查登录态 → （已登录才）加载历史 → 滚到底 → 聚焦输入框
+onMounted(async () => { // 首次进入：读配置 → 查登录态 → （已登录才）加载历史 → 滚到底 → 聚焦输入框
+    const cfg = await fetchConfig();
+    maxInputChars.value = cfg.maxInputChars ?? 2000;
+
     try {
         user.value = await fetchMe();
     } catch {

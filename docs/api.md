@@ -149,7 +149,24 @@ Content-Type: application/json
 
 数据存在 SQLite（`server/data/agent.db`），重启不丢。
 
-## 3. 登录接口
+## 3. 公开配置
+
+前端用它渲染输入上限等，**不需要登录**。
+
+```http
+POST /api/config
+Content-Type: application/json
+
+{}
+```
+
+```json
+{ "code": 0, "message": "success", "data": { "maxInputChars": 2000 } }
+```
+
+`maxInputChars` 来自 `server/src/config/context.js`，前后端不再各写一份常量。
+
+## 4. 登录接口
 
 | 接口 | 说明 | 成功 |
 |---|---|---|
@@ -170,7 +187,7 @@ Content-Type: application/json
 | 换 token / 拉用户失败 | 502 | 2001 |
 | 服务端没配 GitHub OAuth | 500 | 5000 |
 
-## 4. 规划中（未实现，勿依赖）
+## 5. 规划中（未实现，勿依赖）
 
 | 变更 | 说明 |
 |---|---|
@@ -179,7 +196,7 @@ Content-Type: application/json
 | `POST /api/messages` 加分页 | `{ limit, before }` |
 | `POST /api/clear` | 清空会话（本期不做） |
 
-## 5. 契约测试（复制即跑）
+## 6. 契约测试（复制即跑）
 
 ```bash
 BASE=http://localhost:3100
@@ -201,7 +218,7 @@ curl -s -X POST $BASE/nope -H "$J" -d '{}'
 | 空 text / 非字符串 / 坏 JSON | 400 | 1001 / 1002 |
 | 未知接口 | 404 | 1004 |
 
-## 6. 变更记录
+## 7. 变更记录
 
 | 日期 | 变更 |
 |---|---|

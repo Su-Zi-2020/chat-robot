@@ -7,18 +7,6 @@ class MessagesDAO {
     // 所有查询都按 user_id 过滤；传 null 表示未登录的匿名历史。
     // 用 SQLite 的 IS 而不是 =，因为 IS 能正确匹配 NULL。
 
-    /** 取最近 limit 条，按时间正序返回（先 ID 倒序取，再翻转） */
-    listRecent(limit = 100, userId = null) {
-        const db = getDatabase();
-        return db
-            .prepare(
-                `SELECT id, role, content, created_at AS createdAt FROM messages
-                 WHERE user_id IS ? ORDER BY id DESC LIMIT ?`,
-            )
-            .all(userId, limit)
-            .reverse();
-    }
-
     /** 取全部（历史接口用，目前消息量小） */
     listAll(userId = null) {
         const db = getDatabase();
