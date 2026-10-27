@@ -82,7 +82,11 @@ router.get('/github/callback', async (req, res) => {
 
         res.redirect('/'); // 回首页
     } catch (e) {
-        fail(res, 502, CODE.UPSTREAM, `登录失败：${e.message}`);
+        // fetch 的网络错误会带 cause（如 UNABLE_TO_VERIFY_LEAF_SIGNATURE、ENOTFOUND），
+        // 只打 e.message 会永远显示 "fetch failed"，排查不了。
+        const cause = e.cause?.code ?? e.cause?.message ?? '';
+        console.error('[auth] GitHub 请求失败:', e.message, cause);
+        fail(res, 502, CODE.UPSTREAM, `登录失败：${e.message}${cause ? `（${cause}）` : ''}`);
     }
 });
 
