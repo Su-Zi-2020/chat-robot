@@ -27,6 +27,20 @@ export const config = {
 
 两个都没有时，接口返回 `code: 2001` 并提示去配置，不会静默失败。
 
+## 数据库
+
+SQLite，零配置，文件在 `server/data/agent.db`（已 gitignore）。
+
+```bash
+cd server
+npm run db:init     # 首次运行：建表（可重复执行）
+npm start
+```
+
+- 连接配置：`src/config/database.js`（WAL、busy_timeout）
+- SQL 全在 `src/dao/messages.dao.js`
+- 换库只改这两个文件
+
 ## 跑起来（两个终端）
 
 ```bash
@@ -80,11 +94,17 @@ agent/
         ├── server.js       监听端口
         ├── http.js         业务码 + 响应信封（success / fail）
         ├── config.js       配置：环境变量优先，其次本地 config/config.js
+        ├── config/
+        │   └── database.js SQLite 连接（单例、WAL）
+        ├── db/
+        │   └── init.js     建表脚本（npm run db:init）
+        ├── dao/
+        │   └── messages.dao.js 消息表读写，SQL 都在这
         ├── services/
         │   └── llm.js      模型调用：把 SSE 流包成异步生成器
         └── routes/
             ├── chat.js     POST /api/chat（流式转发模型）
-            └── messages.js POST /api/messages（临时内存存储也在这里）
+            └── messages.js POST /api/messages（查库）
 ```
 
 ## 现在有什么
@@ -93,7 +113,8 @@ agent/
 |---|---|
 | 发消息、显示回复 | ✅ |
 | 空输入校验（400） | ✅ |
-| 刷新页面恢复历史 | ✅（内存里，重启就清空） |
+| 刷新页面恢复历史 | ✅ |
+| 重启后历史还在 | ✅ SQLite（`server/data/agent.db`） |
 | 大模型 | ✅ DeepSeek（OpenAI 兼容协议） |
 | 流式 | ✅ SSE 逐字输出，前端带光标动画 |
 | 多轮上下文 | ✅ 带最近 20 条历史 |

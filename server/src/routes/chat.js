@@ -3,7 +3,7 @@
 
 import { Router } from 'express';
 import { fail, CODE } from '../http.js';
-import { appendExchange, listMessages } from './messages.js';
+import messagesDAO from '../dao/messages.dao.js';
 import { streamModel, UpstreamError } from '../services/llm.js';
 import { config } from '../config.js';
 
@@ -25,7 +25,10 @@ router.post('/', async (req, res) => { // 主流程：校验 → 建流 → 转�
     }
 
     // 带上最近若干条历史，让模型有上下文（只取尾部，控制 token）
-    const history = listMessages().slice(-config.maxHistory);
+    // 只取 role/content：id、createdAt 是我们自己的字段，不要发给模型
+    const history = messagesDAO
+        .listRecent(config.maxHistory)
+        .map(({ role, content }) => ({ role, content }));
     const messages = [...history, { role: 'user', content: text }];
 
     // 客户端断开（关页面 / 取消）时中断上游请求，避免白烧 token
@@ -72,7 +75,7 @@ router.post('/', async (req, res) => { // 主流程：校验 → 建流 → 转�
         }
 
         send({ type: 'done' });
-        appendExchange(text, reply); // 只有完整答完才成对写历史
+        messagesDAO.appendExchange(text, reply); // 只有完整答完才成对写历史
     } catch (e) {
         if (controller.signal.aborted) {
             // 客户端主动断开：不写历史，安静结束

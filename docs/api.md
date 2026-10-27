@@ -134,7 +134,16 @@ Content-Type: application/json
 }
 ```
 
-当前没有 `id` / `createdAt`，加持久化时会补，属于**向后兼容的新增字段**。
+字段说明：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | number | 自增主键，前端可用来去重 |
+| `role` | string | `user` / `assistant` |
+| `content` | string | 消息正文 |
+| `createdAt` | number | 毫秒时间戳 |
+
+数据存在 SQLite（`server/data/agent.db`），重启不丢。
 
 ## 3. 规划中（未实现，勿依赖）
 
