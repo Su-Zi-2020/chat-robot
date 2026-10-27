@@ -8,6 +8,7 @@ export const CODE = {
     BAD_JSON: 1002, // 请求体不是合法 JSON
     TOO_LARGE: 1003, // 请求体过大（超过 100KB）
     NOT_FOUND: 1004, // 接口不存在（路径没匹配上）
+    UNAUTHORIZED: 1005, // 未登录或登录已过期
     UPSTREAM: 2001, // 上游模型服务失败：连不上、返回错误、没配 key
     INTERNAL: 5000, // 服务内部错误（未捕获异常）
 };

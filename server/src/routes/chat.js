@@ -6,12 +6,13 @@ import { fail, CODE } from '../http.js';
 import messagesDAO from '../dao/messages.dao.js';
 import { streamModel, UpstreamError } from '../services/llm.js';
 import { config } from '../config.js';
+import { requireUser } from '../middleware/auth.js';
 
 const MAX_TEXT = 2000; // 单条输入上限，和前端 PRD 一致
 
 const router = Router();
 
-router.post('/', async (req, res) => { // 主流程：校验 → 建流 → 转发 → 落库
+router.post('/', requireUser, async (req, res) => { // 主流程：校验 → 建流 → 转发 → 落库
     const raw = req.body?.text;
 
     if (typeof raw !== 'string') {
@@ -27,7 +28,7 @@ router.post('/', async (req, res) => { // 主流程：校验 → 建流 → 转�
     // 带上最近若干条历史，让模型有上下文（只取尾部，控制 token）
     // 只取 role/content：id、createdAt 是我们自己的字段，不要发给模型
     const history = messagesDAO
-        .listRecent(config.maxHistory, req.user?.id ?? null)
+        .listRecent(config.maxHistory, req.user.id)
         .map(({ role, content }) => ({ role, content }));
     const messages = [...history, { role: 'user', content: text }];
 
@@ -75,7 +76,7 @@ router.post('/', async (req, res) => { // 主流程：校验 → 建流 → 转�
         }
 
         send({ type: 'done' });
-        messagesDAO.appendExchange(text, reply, req.user?.id ?? null); // 只有完整答完才成对写历史；未登录则为匿名
+        messagesDAO.appendExchange(text, reply, req.user.id); // 只有完整答完才成对写历史；未登录则为匿名
     } catch (e) {
         if (controller.signal.aborted) {
             // 客户端主动断开：不写历史，安静结束

@@ -12,7 +12,13 @@
             </span>
         </header>
 
-        <main ref="listEl">
+        <main v-if="!user" class="login">
+            <p class="title">需要登录才能开始</p>
+            <a class="primary" href="/api/auth/github">用 GitHub 登录</a>
+            <p class="tip">历史会保存到你的账号，换设备也能继续。</p>
+        </main>
+
+        <main v-else ref="listEl">
             <!-- 空状态：一条消息都没有时显示 -->
             <p v-if="!messages.length" class="empty">说点什么，模型会逐字回你。</p>
 
@@ -25,7 +31,7 @@
             </div>
         </main>
 
-        <form @submit.prevent="send">
+        <form v-if="user" @submit.prevent="send">
             <input ref="inputEl" v-model="input" placeholder="说点什么…" autocomplete="off" />
             <button :disabled="streaming || !input.trim()">发送</button>
         </form>
@@ -80,7 +86,12 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
             },
         });
     } catch (e) {
-        // 失败时把空气泡替换成错误提示，不额外插入新气泡
+        // 会话过期：退回未登录状态，让登录门出现
+        if (String(e.message).includes('登录')) {
+            user.value = null;
+            return;
+        }
+        // 其他失败：把空气泡替换成错误提示
         messages.value[index].content = `出错：${e.message}`;
     } finally {
         streaming.value = false;
@@ -156,6 +167,35 @@ main {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.login {
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: center;
+}
+
+.login .title {
+    margin: 0;
+    color: #e6e8ee;
+    font-size: 15px;
+}
+
+.login .tip {
+    margin: 0;
+    color: #8b93a5;
+    font-size: 12px;
+}
+
+.primary {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 10px;
+    background: #4c8dff;
+    color: #fff;
+    text-decoration: none;
+    font-size: 14px;
 }
 
 .empty {

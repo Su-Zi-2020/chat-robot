@@ -33,9 +33,13 @@
 | 1002 | 400 | 请求体不是合法 JSON | 解析失败 |
 | 1003 | 413 | 请求体过大 | 超过 100KB |
 | 1004 | 404 | 接口不存在 | 路径没匹配上（含用 GET 调 POST 接口） |
+| 1005 | 401 | 未登录 / 登录过期 | 缺少或过期的 session cookie |
 | 5000 | 500 | 服务内部错误 | 未捕获异常 |
 
 `code` 和 `HTTP` 一一对应，前端**只看 `code` 就够了**；状态码是给日志、网关、监控用的。
+
+**登录要求**：`POST /api/chat`、`POST /api/messages` 需要登录态（cookie `sid`）。
+未登录返回 `401` + `{"code":1005,"message":"请先用 GitHub 登录"}`；前端据此显示登录入口。
 
 **前端判定方式固定为：
 
@@ -184,4 +188,5 @@ curl -s -X POST $BASE/nope -H "$J" -d '{}'
 | 2026-10-27 v0.2 | 改为「全 POST + 统一信封」；`GET /api/messages` → `POST /api/messages` |
 | 2026-10-27 v0.3 | 成功固定 200，失败用真实状态码；`code` 与 HTTP 一一对应 |
 | 2026-10-27 v0.4 | `/api/chat` 改为 SSE 流式（mock 数据）；流开始后不再返回信封 |
-| 2026-10-27 v0.5 | **接入 DeepSeek 真实模型**；新增 `UPSTREAM=2001`、`error` 帧；支持多轮历史 |
+| 2026-10-27 v0.5 | 接入 DeepSeek 真实模型；新增 `UPSTREAM=2001`、`error` 帧；支持多轮历史 |
+| 2026-10-27 v0.6 | **强制 GitHub 登录**：chat/messages 需登录态，新增 `UNAUTHORIZED=1005` |

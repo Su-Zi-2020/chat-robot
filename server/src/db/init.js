@@ -11,7 +11,7 @@ console.log('开始初始化数据库...');
 db.exec(`
     CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER, -- 归属用户；NULL = 匿名
+        user_id INTEGER NOT NULL, -- 归属用户（强制登录后必有值）
         role TEXT NOT NULL, -- user | assistant
         content TEXT NOT NULL, -- 消息正文
         created_at INTEGER NOT NULL -- 毫秒时间戳
@@ -42,12 +42,33 @@ db.exec(`
 db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_id ON messages (id);`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions (expires_at);`);
 
-// 迁移：老库的 messages 没有 user_id，补上（可重复执行）
-const cols = db.prepare(`PRAGMA table_info(messages)`).all().map((c) => c.name);
-if (!cols.includes('user_id')) {
-    db.exec(`ALTER TABLE messages ADD COLUMN user_id INTEGER`);
-    console.log('已为 messages 补上 user_id 列');
+// 迁移：把老的 messages 表重建为 user_id NOT NULL 的版本
+const cols = db.prepare(`PRAGMA table_info(messages)`).all();
+const userIdCol = cols.find((c) => c.name === 'user_id');
+
+const needsRebuild = !userIdCol || userIdCol.notnull === 0;
+if (needsRebuild) {
+    const dropped = userIdCol
+        ? db.prepare(`SELECT COUNT(*) AS c FROM messages WHERE user_id IS NULL`).get().c
+        : 0;
+
+    db.exec(`
+        CREATE TABLE messages_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+        INSERT INTO messages_new (id, user_id, role, content, created_at)
+            SELECT id, user_id, role, content, created_at FROM messages WHERE user_id IS NOT NULL;
+        DROP TABLE messages;
+        ALTER TABLE messages_new RENAME TO messages;
+    `);
+
+    console.log(`messages 表已重建为 user_id NOT NULL；丢弃了 ${dropped} 条无主的匿名消息`);
 }
+
 db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_user ON messages (user_id, id);`);
 
 console.log('messages / users / sessions 表已就绪');

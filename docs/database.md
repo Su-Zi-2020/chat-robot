@@ -48,7 +48,7 @@ messages.user_id IS NULL ──── 未登录的匿名历史
 | `role` | TEXT | NOT NULL | `user` / `assistant` |
 | `content` | TEXT | NOT NULL | 消息正文 |
 | `created_at` | INTEGER | NOT NULL | 毫秒时间戳 |
-| `user_id` | INTEGER | 可空 | 归属用户；**NULL = 未登录的匿名历史** |
+| `user_id` | INTEGER | **NOT NULL** | 归属用户（强制登录后必有值） |
 
 索引：
 
@@ -57,22 +57,19 @@ messages.user_id IS NULL ──── 未登录的匿名历史
 | `idx_messages_id (id)` | 按时间取最近 N 条 |
 | `idx_messages_user (user_id, id)` | 某个用户的历史（走索引，不全表扫） |
 
-> 注意：`user_id` 是后来 `ALTER TABLE` 加的列，所以它在表结构的**最后**。
-> 全新初始化的库会在 `id` 后面。SQL 都显式写列名，不受顺序影响。
-
-**为什么 `user_id` 可空**：加登录之前那些消息没有主人，保留为匿名数据，
-和登录用户的历史互相隔离。查询用 `WHERE user_id IS ?`（`IS` 能匹配 NULL）。
+**强制登录后**：所有消息都挂在具体用户上，没有匿名桶。`npm run db:init` 会把
+旧表（user_id 可空）重建成 NOT NULL，并丢弃无主的匿名消息。
 
 ## 典型查询
 
 ```sql
 -- 带上下文调模型：取某用户最近 20 条（先倒序取，再翻转）
 SELECT id, role, content, created_at
-FROM messages WHERE user_id IS ? ORDER BY id DESC LIMIT 20;
+FROM messages WHERE user_id = ? ORDER BY id DESC LIMIT 20;
 
 -- 历史接口：全量
 SELECT id, role, content, created_at AS createdAt
-FROM messages WHERE user_id IS ? ORDER BY id;
+FROM messages WHERE user_id = ? ORDER BY id;
 
 -- 登录：按 github_id 找用户
 SELECT * FROM users WHERE github_id = ?;
@@ -92,7 +89,7 @@ DELETE FROM sessions WHERE expires_at < ?;
 | 没有 `conversations` 表 | 当前一个用户只有一条连续的对话流，不需要分段 |
 | 消息成对写入（事务） | 不会出现"有问无答"的残缺轮次 |
 | WAL 模式 | 读写并发更好，崩溃恢复更安全 |
-| 没用 `user_id` 做外键约束在 messages 上 | 匿名消息的 `user_id` 为 NULL，也不需要级联删除历史 |
+| messages 不建外键到 users | 删用户时不想级联删掉历史；也确实不需要约束 |
 
 ## 将来要加什么
 
