@@ -8,6 +8,9 @@
 
 **所有接口都是 POST**，请求体一律 `Content-Type: application/json`（没有参数也要发 `{}`）。
 
+**例外**：`POST /api/chat` 的**响应**是 `text/event-stream`（流式），但**请求**仍是 JSON。
+流开始后的数据不走信封，格式见第 1 节。
+
 **成功固定 `200`。失败用真实状态码**（400 / 404 / 413 / 500），不发明 2xx 的子状态。
 响应体统一信封：
 
@@ -45,9 +48,9 @@ if (data.code !== 0) throw new Error(data.message);
 未来接入网关、降级页时更不容易丢；而连接层失败（后端没起、断网）
 `fetch` 会直接 reject，仍然要靠 `try/catch` 兜住。
 
-## 1. POST /api/chat
+## 1. POST /api/chat（流式）
 
-发一句话，拿回一条回复（当前为假回复，未调用模型）。
+发一句话，**以 SSE 流式返回**。当前是 mock：服务端把一段固定回复按字切开推送，未接模型。
 
 **请求**
 
@@ -58,30 +61,44 @@ if (data.code !== 0) throw new Error(data.message);
 ```http
 POST /api/chat
 Content-Type: application/json
+Accept: text/event-stream
 
 { "text": "你好" }
 ```
 
-**成功**
+**成功响应**：`200`，`Content-Type: text/event-stream`
 
-```json
-{ "code": 0, "message": "success", "data": { "reply": "我收到了：「你好」。…" } }
+```
+data: {"type":"start"}
+
+data: {"delta":"收到"}
+
+data: {"delta":"你的"}
+
+data: {"type":"done"}
+
 ```
 
-**失败**
+| 帧 | 含义 | 前端动作 |
+|---|---|---|
+| `{"type":"start"}` | 流开始 | 可放空气泡 |
+| `{"delta":"…"}` | 增量文本 | 追加到当前气泡 |
+| `{"type":"done"}` | 结束 | 停止光标动画 |
 
-| 触发条件 | 响应 |
-|---|---|
-| 缺 `text` / 类型不是字符串 | `{"code":1001,"message":"text 必须是字符串"}` |
-| 去空白后为空 | `{"code":1001,"message":"text 不能为空"}` |
-| 超过 2000 字符 | `{"code":1001,"message":"text 过长（上限 2000 字）"}` |
-| 请求体不是合法 JSON | `{"code":1002,"message":"请求体不是合法 JSON"}` |
+**注意**：流一旦开始，**不能再返回信封**。错误只能发生在流开始之前。
 
-**边界行为（已验证）**
+**失败（流开始前）**：仍是 JSON 信封，非 200。
 
-- 任何失败都不会写入历史，不会出现"有问无答"；
-- 成功时成对写入 user + assistant 两条；
-- 不做类型强转：`{"text":123}` 直接拒绝。
+| 触发条件 | HTTP | code |
+|---|---|---|
+| 缺 `text` / 类型不是字符串 | 400 | 1001 |
+| 去空白后为空 | 400 | 1001 |
+| 超过 2000 字符 | 400 | 1001 |
+| 请求体不是合法 JSON | 400 | 1002 |
+
+**落库时机**：只有 `done` 之后才把 user + assistant 成对写入历史；客户端中途断开则不写。
+
+**客户端断开**：服务端通过 `res.on('close')` 感知，立刻停止推送。
 
 ## 2. POST /api/messages
 
@@ -148,4 +165,5 @@ curl -s -X POST $BASE/nope -H "$J" -d '{}'
 |---|---|
 | 2026-10-27 v0.1 | 首版；补类型校验、长度上限、JSON 兜底 |
 | 2026-10-27 v0.2 | 改为「全 POST + 统一信封」；`GET /api/messages` → `POST /api/messages` |
-| 2026-10-27 v0.3 | **成功固定 200，失败用真实状态码**；`code` 与 HTTP 一一对应 |
+| 2026-10-27 v0.3 | 成功固定 200，失败用真实状态码；`code` 与 HTTP 一一对应 |
+| 2026-10-27 v0.4 | **`/api/chat` 改为 SSE 流式**（mock 数据）；流开始后不再返回信封 |

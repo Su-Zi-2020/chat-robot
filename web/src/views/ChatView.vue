@@ -1,16 +1,15 @@
-
 <template>
   <div class="app">
-    <header>最简对话 demo（无模型 · 无流式）</header>
+    <header>流式对话 demo（mock 数据，未接模型）</header>
 
     <main ref="listEl">
-      <p v-if="!messages.length" class="empty">说点什么，后端会原样回显。</p>
+      <p v-if="!messages.length" class="empty">说点什么，后端会逐字回给你。</p>
       <div
         v-for="(m, i) in messages"
         :key="i"
         class="msg"
         :class="m.role"
-      >{{ m.content }}</div>
+      >{{ m.content }}<span v-if="m.role === 'assistant' && streaming && i === messages.length - 1" class="caret">▍</span></div>
     </main>
 
     <form @submit.prevent="send">
@@ -20,17 +19,18 @@
         placeholder="说点什么…"
         autocomplete="off"
       />
-      <button :disabled="busy || !input.trim()">发送</button>
+      <button :disabled="streaming || !input.trim()">发送</button>
     </form>
   </div>
 </template>
 
 <script setup>
 import { nextTick, onMounted, ref } from 'vue';
+import { fetchMessages, streamChat } from '../api';
 
 const messages = ref([]);
 const input = ref('');
-const busy = ref(false);
+const streaming = ref(false);
 const listEl = ref(null);
 const inputEl = ref(null);
 
@@ -41,45 +41,44 @@ function scrollToBottom() {
 
 async function loadHistory() {
   try {
-    const res = await fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: '{}',
-    });
-    const data = await res.json();
-    if (data.code !== 0) throw new Error(data.message);
-    messages.value = data.data.messages ?? [];
+    messages.value = await fetchMessages();
   } catch {
-    // 后端没起来时静默失败，页面上直接发消息会报错提示
+    // 后端没起来时静默失败，发消息会报错提示
   }
 }
 
 async function send() {
   const text = input.value.trim();
-  if (!text || busy.value) return;
+  if (!text || streaming.value) return;
 
   messages.value.push({ role: 'user', content: text });
   input.value = '';
-  busy.value = true;
+  streaming.value = true;
+
+  // 先占一个空气泡，边收边填
+  const bubble = { role: 'assistant', content: '' };
+  messages.value.push(bubble);
+  const index = messages.value.length - 1;
+
   await nextTick();
   scrollToBottom();
 
   try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text }),
+    await streamChat({
+      text,
+      onDelta: (delta) => {
+        messages.value[index].content += delta;
+        scrollToBottom();
+      },
     });
-    const data = await res.json();
-    if (data.code !== 0) throw new Error(data.message || '请求失败');
-    messages.value.push({ role: 'assistant', content: data.data.reply });
   } catch (e) {
-    messages.value.push({ role: 'assistant', content: `出错：${e.message}` });
+    // 失败时把空气泡换成错误提示
+    messages.value[index].content = `出错：${e.message}`;
   } finally {
-    busy.value = false;
+    streaming.value = false;
     await nextTick();
     scrollToBottom();
-    inputEl.value?.focus();   // 光标回到输入框，可以接着打
+    inputEl.value?.focus();
   }
 }
 
@@ -126,6 +125,9 @@ main {
 }
 .msg.user { align-self: flex-end; background: #4c8dff; color: #fff; }
 .msg.assistant { align-self: flex-start; background: #171a21; border: 1px solid #262b36; }
+
+.caret { color: #4c8dff; animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
 
 form {
   display: flex;
