@@ -58,6 +58,9 @@ export async function streamChat({ text, onDelta, signal }) {
       if (!line.startsWith('data:')) continue;
 
       const payload = JSON.parse(line.slice(5).trim());
+      if (payload.type === 'error') {
+        throw new Error(payload.message ?? '生成中断');
+      }
       if (payload.delta) {
         full += payload.delta;
         onDelta?.(payload.delta);

@@ -1,11 +1,31 @@
-# 最简对话 demo（Vue + Express）
+# 对话 demo（Vue + Express + DeepSeek）
 
-**流式输出（mock 数据，未接模型）。** 前后端分离，两个项目：
+**流式对话，已接入 DeepSeek。** 前后端分离，两个项目：
 
 - `web/`  Vue 3 + Vite，开发端口 5173
 - `server/`  Express，端口 3100
 
-功能只有一件事：你发一句话，后端回一句占位的话。
+你发一句话，模型逐字回给你，历史保留在内存里（多轮有效）。
+
+## 配置 API key
+
+后端从两处读 key，**环境变量优先**：
+
+```bash
+# 方式一：环境变量（推荐，部署时用）
+export DEEPSEEK_API_KEY=sk-xxxx
+```
+
+```js
+// 方式二：本地文件 server/config/config.js（已被 .gitignore 忽略）
+export const config = {
+  apiKey: 'sk-xxxx',
+  baseUrl: 'https://api.deepseek.com/v1',
+  model: 'deepseek-chat',
+};
+```
+
+两个都没有时，接口返回 `code: 2001` 并提示去配置，不会静默失败。
 
 ## 跑起来（两个终端）
 
@@ -58,11 +78,12 @@ agent/
     └── src/
         ├── app.js          组装层：挂中间件和路由
         ├── server.js       监听端口
-        ├── http.js         业务码 + 响应信封（ok / fail）
+        ├── http.js         业务码 + 响应信封（success / fail）
+        ├── config.js       配置：环境变量优先，其次本地 config/config.js
         ├── services/
-        │   └── reply.js    业务层（将来换真实模型）
+        │   └── llm.js      模型调用：把 SSE 流包成异步生成器
         └── routes/
-            ├── chat.js     POST /api/chat
+            ├── chat.js     POST /api/chat（流式转发模型）
             └── messages.js POST /api/messages（临时内存存储也在这里）
 ```
 
@@ -73,14 +94,16 @@ agent/
 | 发消息、显示回复 | ✅ |
 | 空输入校验（400） | ✅ |
 | 刷新页面恢复历史 | ✅（内存里，重启就清空） |
-| 大模型 | ❌ 占位回复 |
-| 流式 | ✅ SSE，服务端每 40ms 推 2 个字（mock） |
+| 大模型 | ✅ DeepSeek（OpenAI 兼容协议） |
+| 流式 | ✅ SSE 逐字输出，前端带光标动画 |
+| 多轮上下文 | ✅ 带最近 20 条历史 |
+| 出错提示 | ✅ 上游失败返回 502 + code 2001，流中断发 error 帧 |
 
 ## 分支
 
 | 分支 | 内容 |
 |---|---|
-| `main` | 当前版本：Vue 3 + Express，SSE 流式（mock 回复，未接模型） |
+| `main` | 当前版本：Vue 3 + Express，SSE 流式 + DeepSeek |
 | `prototype-react` | 早期的完整原型：React + SSE 流式 + 接 DeepSeek（参考用） |
 
 

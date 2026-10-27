@@ -1,66 +1,85 @@
-// POST /api/chat —— 流式返回。
-// 现在是 mock：把一段固定回复按字切开、定时推送，用来验证前端逐字渲染。
-// 接真实模型时，只要把 generateReply + 循环换成模型的增量流即可。
+// POST /api/chat —— 流式转发模型的 SSE。
+// 帧格式：{"type":"start"} / {"delta":"…"} / {"type":"done"} / {"type":"error","message":"…"}
 
 import { Router } from 'express';
 import { fail, CODE } from '../http.js';
-import { appendExchange } from './messages.js';
-import { generateReply } from '../services/reply.js';
+import { appendExchange, listMessages } from './messages.js';
+import { streamModel, UpstreamError } from '../services/llm.js';
+import { config } from '../config.js';
 
 const MAX_TEXT = 2000;
-const CHUNK_SIZE = 2;      // 每次推几个字
-const CHUNK_DELAY = 40;    // 毫秒
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const router = Router();
 
 router.post('/', async (req, res) => {
-  const raw = req.body?.text;
+    const raw = req.body?.text;
 
-  if (typeof raw !== 'string') {
-    return fail(res, 400, CODE.BAD_PARAM, 'text 必须是字符串');
-  }
+    if (typeof raw !== 'string') {
+        return fail(res, 400, CODE.BAD_PARAM, 'text 必须是字符串');
+    }
 
-  const text = raw.trim();
-  if (!text) return fail(res, 400, CODE.BAD_PARAM, 'text 不能为空');
-  if ([...text].length > MAX_TEXT) {
-    return fail(res, 400, CODE.BAD_PARAM, `text 过长（上限 ${MAX_TEXT} 字）`);
-  }
+    const text = raw.trim();
+    if (!text) return fail(res, 400, CODE.BAD_PARAM, 'text 不能为空');
+    if ([...text].length > MAX_TEXT) {
+        return fail(res, 400, CODE.BAD_PARAM, `text 过长（上限 ${MAX_TEXT} 字）`);
+    }
 
-  // 走 SSE
-  res.writeHead(200, {
-    'content-type': 'text/event-stream; charset=utf-8',
-    'cache-control': 'no-cache, no-transform',
-    connection: 'keep-alive',
-    'x-accel-buffering': 'no', // 让 nginx 不要缓冲
-  });
+    // 带上最近若干条历史，让模型有上下文
+    const history = listMessages().slice(-config.maxHistory);
+    const messages = [...history, { role: 'user', content: text }];
 
-  const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+    // 先建连、先拿响应头：这样上游失败时还能返回 JSON 信封
+    const controller = new AbortController();
+    res.on('close', () => {
+        if (!res.writableEnded) controller.abort();   // 客户端走了，中断上游
+    });
 
-  // 客户端断开（关页面/取消）时停止推送。
-  // 注意：不能用 req.on('close')，它在请求体读完时就触发了（Node 16+ 的行为）。
-  let aborted = false;
-  res.on('close', () => {
-    if (!res.writableEnded) aborted = true;   // 正常结束时 writableEnded 为 true
-  });
+    const stream = streamModel({ messages, signal: controller.signal });
 
-  const reply = generateReply(text);
-  const chars = [...reply]; // 按字符切，避免把 emoji 切成两半
+    let first;
+    try {
+        first = await stream.next();                 // 拉第一段，确认上游可用
+    } catch (e) {
+        if (e instanceof UpstreamError) {
+            return fail(res, e.status, CODE.UPSTREAM, e.message);
+        }
+        return fail(res, 500, CODE.INTERNAL, '模型调用失败');
+    }
 
-  send({ type: 'start' });
+    res.writeHead(200, {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache, no-transform',
+        connection: 'keep-alive',
+        'x-accel-buffering': 'no',
+    });
 
-  for (let i = 0; i < chars.length; i += CHUNK_SIZE) {
-    if (aborted) return res.end();
-    send({ delta: chars.slice(i, i + CHUNK_SIZE).join('') });
-    await sleep(CHUNK_DELAY);
-  }
+    const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+    send({ type: 'start' });
 
-  if (aborted) return res.end();
+    let reply = '';
 
-  send({ type: 'done' });
-  appendExchange(text, reply);   // 只有完整推送完才落历史
-  res.end();
+    try {
+        if (!first.done && first.value) {
+            reply += first.value;
+            send({ delta: first.value });
+        }
+
+        for await (const delta of stream) {
+            reply += delta;
+            send({ delta });
+        }
+
+        send({ type: 'done' });
+        appendExchange(text, reply);
+    } catch (e) {
+        if (controller.signal.aborted) {
+            // 客户端主动断开：不写历史，直接结束
+        } else {
+            send({ type: 'error', message: e.message ?? '生成中断' });
+        }
+    } finally {
+        res.end();
+    }
 });
 
 export default router;
