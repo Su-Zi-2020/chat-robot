@@ -166,7 +166,40 @@ Content-Type: application/json
 
 `maxInputChars` 来自 `server/src/config/context.js`，前后端不再各写一份常量。
 
-## 4. 登录接口
+## 4. 角色卡（单例）
+
+```http
+POST /api/persona
+Content-Type: application/json
+
+{}
+```
+
+```json
+{
+  "code": 0, "message": "success",
+  "data": {
+    "persona": {
+      "name": "小忆",
+      "avatar": "🌙",
+      "prompt": "你是「小忆」，22 岁插画师……",
+      "examples": [["今天好累", "嗯，那别硬撑了。先去躺着。"]],
+      "tailPrompt": "保持小忆的语气：简短、口语、直接。不要自称 AI。"
+    }
+  }
+}
+```
+
+修改（需登录）：
+
+```http
+POST /api/persona/save
+{ "name": "小忆", "prompt": "……", "examples": [["用户说","她说"]], "tailPrompt": "……" }
+```
+
+限制：`name` ≤20 字、`prompt` ≤1000 字、`tailPrompt` ≤120 字、`examples` ≤5 组且每组 ≤100 字。
+
+## 5. 登录接口
 
 | 接口 | 说明 | 成功 |
 |---|---|---|
@@ -187,7 +220,7 @@ Content-Type: application/json
 | 换 token / 拉用户失败 | 502 | 2001 |
 | 服务端没配 GitHub OAuth | 500 | 5000 |
 
-## 5. 规划中（未实现，勿依赖）
+## 6. 规划中（未实现，勿依赖）
 
 | 变更 | 说明 |
 |---|---|
@@ -196,7 +229,7 @@ Content-Type: application/json
 | `POST /api/messages` 加分页 | `{ limit, before }` |
 | `POST /api/clear` | 清空会话（本期不做） |
 
-## 6. 契约测试（复制即跑）
+## 7. 契约测试（复制即跑）
 
 ```bash
 BASE=http://localhost:3100
@@ -218,7 +251,7 @@ curl -s -X POST $BASE/nope -H "$J" -d '{}'
 | 空 text / 非字符串 / 坏 JSON | 400 | 1001 / 1002 |
 | 未知接口 | 404 | 1004 |
 
-## 7. 变更记录
+## 8. 变更记录
 
 | 日期 | 变更 |
 |---|---|

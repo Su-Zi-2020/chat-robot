@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { getDatabase } from '../config/database.js';
 import { estimateMessages, estimateTokens } from './tokens.js';
 import { complete } from './llm.js';
+import { personaMessages } from './persona.js';
 
 const C = config.context;
 
@@ -52,18 +53,26 @@ export function buildContext(userId) {
         )
         .all(userId, untilId);
 
-    // 2) 摘要 + 原文超出预算时，从最老的原文开始丢（成对丢，保持问答完整）
-    const parts = [];
+    // 2) 角色卡：人设放最前，复述放最后（防人设被长历史稀释）
+    const persona = personaMessages();
+
+    // 3) 摘要 + 原文超出预算时，从最老的原文开始丢（成对丢，保持问答完整）
+    const parts = [persona.head];
     if (summary) parts.push({ role: 'system', content: `以下是更早对话的摘要：\n${summary}` });
 
-    let used = estimateMessages(parts) + estimateMessages(recent);
+    const tailParts = persona.tail ? [persona.tail] : [];
+    let used = estimateMessages(parts) + estimateMessages(recent) + estimateMessages(tailParts);
 
     while (used > C.maxInputTokens && recent.length > 2) {
         recent = recent.slice(2); // 丢掉最老的一问一答
-        used = estimateMessages(parts) + estimateMessages(recent);
+        used = estimateMessages(parts) + estimateMessages(recent) + estimateMessages(tailParts);
     }
 
-    return [...parts, ...recent.map(({ role, content }) => ({ role, content: clipMessage(content) }))];
+    return [
+        ...parts,
+        ...recent.map(({ role, content }) => ({ role, content: clipMessage(content) })),
+        ...tailParts,
+    ];
 }
 
 // ---------- 写：滚动摘要 ----------
@@ -103,7 +112,8 @@ export async function compactIfNeeded(userId) {
                 '1. 只保留以后还有用的信息：用户的事实、偏好、正在经历的事、情绪与边界；\n' +
                 '2. 不要复述过程，不要评价，不要加标题；\n' +
                 '3. 同一件事以最新说法为准；\n' +
-                '4. 总长不超过 300 字。',
+                '4. 不要改写角色的人格设定，只记录对话内容和用户信息；\n' +
+                '5. 总长不超过 300 字。',
         },
         {
             role: 'user',

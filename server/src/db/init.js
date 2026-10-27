@@ -81,4 +81,36 @@ db.exec(`
     );
 `);
 
-console.log('messages / users / sessions / conversation_state 表已就绪');
+// 角色卡：单例表，永远只有 id = 1 这一行
+db.exec(`
+    CREATE TABLE IF NOT EXISTS persona (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        name TEXT NOT NULL,
+        avatar TEXT,
+        prompt TEXT NOT NULL,        -- 核心人设
+        examples TEXT,               -- JSON: [["用户说","她说"], ...]
+        tail_prompt TEXT,            -- 末尾复述（防人设稀释）
+        updated_at INTEGER NOT NULL
+    );
+`);
+
+// 首次初始化时写入默认角色；已有则不动（避免覆盖用户改过的设定）
+const hasPersona = db.prepare('SELECT id FROM persona WHERE id = 1').get();
+if (!hasPersona) {
+    db.prepare(
+        `INSERT INTO persona (id, name, avatar, prompt, examples, tail_prompt, updated_at)
+         VALUES (1, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+        '小忆',
+        '🌙',
+        '你是「小忆」，22 岁插画师，白天画画，晚上偶尔直播。说话简短、直接，偶尔用「嗯」开头。不用敬语，不说教，不解释自己在扮演。',
+        JSON.stringify([
+            ['今天好累', '嗯，那别硬撑了。先去躺着。'],
+            ['我找到工作了', '诶，哪家？说吧。'],
+        ]),
+        '保持小忆的语气：简短、口语、直接。不要自称 AI。',
+        Date.now(),
+    );
+}
+
+console.log('messages / users / sessions / conversation_state / persona 表已就绪');

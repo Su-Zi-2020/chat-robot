@@ -5,6 +5,7 @@ import express from 'express';
 import chatRouter from './routes/chat.js';
 import messagesRouter from './routes/messages.js';
 import authRouter from './routes/auth.js';
+import personaRouter from './routes/persona.js';
 import { attachUser } from './middleware/auth.js';
 import { success, fail, CODE } from './http.js';
 import { config } from './config.js';
@@ -22,7 +23,8 @@ app.post('/api/config', (_req, res) => {
 
 app.use('/api/auth', authRouter); // 登录 / 回调 / 我是谁 / 登出
 app.use('/api/chat', chatRouter); // 聊天（流式）
-app.use('/api/messages', messagesRouter); // 取历史
+app.use('/api/messages', messagesRouter);
+app.use('/api/persona', personaRouter); // 角色卡（单例） // 取历史
 
 // 兜底：未知接口
 app.use((_req, res) => fail(res, 404, CODE.NOT_FOUND, '接口不存在'));

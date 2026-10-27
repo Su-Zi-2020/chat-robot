@@ -27,6 +27,17 @@ maxInputTokens > compactTriggerTokens + summaryMaxTokens + 保留区
 
 容量参考：24000 token ≈ 3.6 万汉字 ≈ 240 轮短对话。
 
+## 消息顺序
+
+```
+[system]   角色卡：人设 + 示例        ← 常驻
+[system]   摘要（更早的对话）          ← 有摘要时
+[user/assistant] 最近原文
+[system]   末尾复述（tail_prompt）     ← 常驻，放在最后防稀释
+```
+
+角色卡内容来自单例表 `persona`（`services/persona.js`，进程内缓存，保存后失效）。
+
 ## 装配 `buildContext(userId)`
 
 ```
@@ -61,6 +72,7 @@ maxInputTokens > compactTriggerTokens + summaryMaxTokens + 保留区
 - 只保留以后有用的：事实、偏好、进行中的事、情绪、边界
 - 不复述过程、不评价、不加标题
 - 同一件事以最新说法为准
+- **不改写角色的人格设定**，只记录对话内容和用户信息
 - 不超过 300 字
 
 ## token 估算
