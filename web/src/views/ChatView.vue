@@ -40,7 +40,7 @@
 
 <script setup>
 import { nextTick, onMounted, ref } from 'vue';
-import { fetchMessages, fetchMe, logout, streamChat } from '../api';
+import { ApiError, fetchMessages, fetchMe, logout, streamChat } from '../api';
 
 const messages = ref([]); // 消息列表：{ role, content }
 const input = ref(''); // 输入框内容
@@ -86,8 +86,8 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
             },
         });
     } catch (e) {
-        // 会话过期：退回未登录状态，让登录门出现
-        if (String(e.message).includes('登录')) {
+        // 1005 = 未登录/登录过期：退回登录门（不靠文案判断）
+        if (e instanceof ApiError && e.code === 1005) {
             user.value = null;
             return;
         }
@@ -101,16 +101,19 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
     }
 }
 
-async function doLogout() { // 退出后回到匿名历史
+async function doLogout() { // 退出：清服务端 session + 清空界面，回到登录门
     await logout();
     user.value = null;
     messages.value = [];
-    await loadHistory();
 }
 
-onMounted(async () => { // 首次进入：查登录态 → 加载历史 → 滚到底 → 聚焦输入框
-    user.value = await fetchMe();
-    await loadHistory();
+onMounted(async () => { // 首次进入：查登录态 → （已登录才）加载历史 → 滚到底 → 聚焦输入框
+    try {
+        user.value = await fetchMe();
+    } catch {
+        user.value = null; // 查不到登录态就按未登录处理，不阻塞页面
+    }
+    if (user.value) await loadHistory();
     await nextTick();
     scrollToBottom();
     inputEl.value?.focus();

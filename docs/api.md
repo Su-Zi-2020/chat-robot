@@ -149,7 +149,28 @@ Content-Type: application/json
 
 数据存在 SQLite（`server/data/agent.db`），重启不丢。
 
-## 3. 规划中（未实现，勿依赖）
+## 3. 登录接口
+
+| 接口 | 说明 | 成功 |
+|---|---|---|
+| `GET /api/auth/github` | 302 跳到 GitHub 授权页 | 302 |
+| `GET /api/auth/github/callback` | GitHub 回调：换 token、建号、发 session | 302 回首页 |
+| `GET /api/auth/me` | 当前登录用户 | `200 { code:0, data:{ user } }`，未登录时 `user: null` |
+| `POST /api/auth/logout` | 删当前 session | `200 { code:0 }` |
+
+**登录态**：cookie `sid=<token>`（HttpOnly、SameSite=Lax、30 天）。
+服务端用它与 `sessions` 表比对，过期或不存在都视为未登录。
+
+**失败**：
+
+| 触发条件 | HTTP | code |
+|---|---|---|
+| state 校验失败 | 400 | 1001 |
+| 缺少 code | 400 | 1001 |
+| 换 token / 拉用户失败 | 502 | 2001 |
+| 服务端没配 GitHub OAuth | 500 | 5000 |
+
+## 4. 规划中（未实现，勿依赖）
 
 | 变更 | 说明 |
 |---|---|
@@ -158,7 +179,7 @@ Content-Type: application/json
 | `POST /api/messages` 加分页 | `{ limit, before }` |
 | `POST /api/clear` | 清空会话（本期不做） |
 
-## 4. 契约测试（复制即跑）
+## 5. 契约测试（复制即跑）
 
 ```bash
 BASE=http://localhost:3100
@@ -180,7 +201,7 @@ curl -s -X POST $BASE/nope -H "$J" -d '{}'
 | 空 text / 非字符串 / 坏 JSON | 400 | 1001 / 1002 |
 | 未知接口 | 404 | 1004 |
 
-## 5. 变更记录
+## 6. 变更记录
 
 | 日期 | 变更 |
 |---|---|

@@ -22,7 +22,7 @@ router.get('/github', (req, res) => {
     }
 
     const state = randomUUID(); // 防 CSRF：回来时要和 cookie 里的对上
-    setCookie(res, STATE_COOKIE, state, { maxAge: 10 * 60 * 1000 });
+    setCookie(res, STATE_COOKIE, state, { maxAge: 30 * 60 * 1000 }); // 给用户在授权页停留的时间
 
     const params = new URLSearchParams({
         client_id: config.github.clientId,

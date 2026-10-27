@@ -76,7 +76,13 @@ router.post('/', requireUser, async (req, res) => { // 主流程：校验 → �
         }
 
         send({ type: 'done' });
-        messagesDAO.appendExchange(text, reply, req.user.id); // 只有完整答完才成对写历史；未登录则为匿名
+
+        try {
+            messagesDAO.appendExchange(text, reply, req.user.id); // 只有完整答完才成对写历史
+        } catch (e) {
+            // done 帧已经发出去了，改不了响应；只能记日志，避免"用户以为存了其实没存"
+            console.error('[chat] 写入历史失败:', e.message);
+        }
     } catch (e) {
         if (controller.signal.aborted) {
             // 客户端主动断开：不写历史，安静结束

@@ -1,22 +1,52 @@
 // 前端所有后端调用的出口：统一处理信封、错误、SSE 解析。
+// 约定：HTTP 状态码只作参考，业务结果一律看响应体里的 code（0 = 成功）。
 // 接口契约见 docs/api.md。
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
+/** 带上业务码的错误，界面可以按 code 区分处理（如 1005 = 未登录） */
+export class ApiError extends Error {
+    constructor(message, code, status) {
+        super(message);
+        this.name = 'ApiError';
+        this.code = code;
+        this.status = status;
+    }
+}
+
+// 解析响应体；不是 JSON 就返回 null（比如网关返回了 HTML 错误页）
+async function readJson(res) {
+    return res.json().catch(() => null);
+}
+
 /** 取历史消息 */
-export async function fetchMessages() { // 拉取全部历史（全 POST）
+export async function fetchMessages() { // 拉取当前用户的全部历史
     const res = await fetch('/api/messages', {
         method: 'POST',
         headers: JSON_HEADERS,
-        body: '{}', // 没有参数也要发空对象，保持协议一致
+        body: '{}',
     });
 
-    const data = await res.json().catch(() => null);
-    // 两种失败都收敛成同一个 Error：HTTP 非 2xx、或业务 code 非 0
-    if (!res.ok || !data || data.code !== 0) {
-        throw new Error(data?.message ?? `请求失败（HTTP ${res.status}）`);
+    const body = await readJson(res);
+    if (!body || body.code !== 0) {
+        throw new ApiError(body?.message ?? `请求失败（HTTP ${res.status}）`, body?.code, res.status);
     }
-    return data.data.messages ?? [];
+    return body.data.messages ?? [];
+}
+
+/** 当前登录用户；未登录返回 null */
+export async function fetchMe() { // 查登录态
+    const res = await fetch('/api/auth/me');
+    const body = await readJson(res);
+    if (!body || body.code !== 0) {
+        throw new ApiError(body?.message ?? `请求失败（HTTP ${res.status}）`, body?.code, res.status);
+    }
+    return body.data.user ?? null;
+}
+
+/** 退出登录（失败也不影响界面，最多提示一下） */
+export async function logout() { // 清服务端 session + cookie
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
 }
 
 /**
@@ -33,13 +63,15 @@ export async function streamChat({ text, onDelta, signal }) { // 流式对话：
         signal, // 外部可中断（关页面 / 停止按钮）
     });
 
-    // 建连前的失败仍是 JSON 信封：参数错误 400、上游失败 502
-    if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.message ?? `请求失败（HTTP ${res.status}）`);
+    // 流式成功时 content-type 是 text/event-stream；
+    // 其他情况（400 / 401 / 502 / 网关错误页）都是"流没开始"，读信封拿 code
+    const isStream = (res.headers.get('content-type') ?? '').includes('text/event-stream');
+    if (!isStream) {
+        const body = await readJson(res);
+        throw new ApiError(body?.message ?? `请求失败（HTTP ${res.status}）`, body?.code, res.status);
     }
 
-    if (!res.body) throw new Error('响应没有 body，浏览器可能不支持流式');
+    if (!res.body) throw new ApiError('响应没有 body，浏览器可能不支持流式', undefined, res.status);
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -61,7 +93,8 @@ export async function streamChat({ text, onDelta, signal }) { // 流式对话：
             const payload = JSON.parse(line.slice(5).trim());
 
             if (payload.type === 'error') {
-                throw new Error(payload.message ?? '生成中断'); // 流已开始，只能靠帧报错
+                // 流已经开始，错误只能靠帧传达
+                throw new ApiError(payload.message ?? '生成中断');
             }
             if (payload.delta) {
                 full += payload.delta;
@@ -71,16 +104,4 @@ export async function streamChat({ text, onDelta, signal }) { // 流式对话：
         }
     }
     return full;
-}
-
-/** 当前登录用户；未登录返回 null */
-export async function fetchMe() {
-    const res = await fetch('/api/auth/me');
-    const data = await res.json().catch(() => null);
-    return data?.data?.user ?? null;
-}
-
-/** 退出登录 */
-export async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
 }
