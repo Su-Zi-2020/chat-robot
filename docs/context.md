@@ -19,10 +19,13 @@
 
 ```
 1. 读 conversation_state：summary、summary_until_id
-2. 取 id > summary_until_id 的最近 recentMessages 条原文
-3. 拼装：摘要（system）→ 最近原文
+2. 取 id > summary_until_id 的【全部】原文（按 id 升序）
+3. 拼装：摘要（system）→ 原文
 4. 若总 token > maxInputTokens：从最老的问答开始成对丢弃，直到不超预算
 ```
+
+**注意**：第 2 步必须取"全部"，不能只取最后 N 条——否则 `until_id` 和窗口之间会
+出现"既没进摘要、也没发给模型"的空洞（实测踩过）。
 
 返回的消息数组**不含**人设 system 和本轮输入（由调用方追加）。
 

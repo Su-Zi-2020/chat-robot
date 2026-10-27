@@ -27,14 +27,14 @@ export function buildContext(userId) {
     const db = getDatabase();
     const { summary, untilId } = getState(userId);
 
-    // 1) 取最近 N 条原文
+    // 1) 取摘要之后的【全部】原文（不是只取最后 N 条！）
+    //    否则 until_id 到最后 12 条之间会出现"既不在摘要里、也没发给模型"的空洞。
     let recent = db
         .prepare(
             `SELECT id, role, content FROM messages
-             WHERE user_id = ? AND id > ? ORDER BY id DESC LIMIT ?`,
+             WHERE user_id = ? AND id > ? ORDER BY id`,
         )
-        .all(userId, untilId, C.recentMessages)
-        .reverse();
+        .all(userId, untilId);
 
     // 2) 摘要 + 原文超出预算时，从最老的原文开始丢（成对丢，保持问答完整）
     const parts = [];
