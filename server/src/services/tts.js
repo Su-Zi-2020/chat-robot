@@ -60,7 +60,7 @@ export async function synthesize(text) {
     const cacheFile = join(CACHE_DIR, `${hash}.${format}`);
     if (existsSync(cacheFile)) return readFileSync(cacheFile);
 
-    const body = JSON.stringify({ text: clean, reference_id: modelId, format });
+    const body = JSON.stringify({ text: clean, reference_id: modelId, format, latency: config.tts.latency });
     let buf;
 
     try {
@@ -80,6 +80,10 @@ export async function synthesize(text) {
         // 直连失败（常见于国内网络）：走系统代理用 curl 重试
         if (!config.tts.proxy) throw new TtsUnavailable(`连不上 TTS 服务：${e.message}`);
         buf = await synthesizeViaCurl({ body, proxy: config.tts.proxy });
+    }
+
+    if (buf[0] === 0x7b) { // 以 '{' 开头的是 JSON 错误体，不能当音频缓存
+        throw new TtsUnavailable(`TTS 返回了错误内容：${buf.toString('utf8').slice(0, 200)}`);
     }
 
     writeFileSync(cacheFile, buf);

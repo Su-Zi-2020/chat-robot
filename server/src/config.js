@@ -53,6 +53,7 @@ export const config = {
         modelId: process.env.FISH_MODEL_ID ?? fileConfig.fish?.modelId ?? '',
         format: process.env.FISH_FORMAT ?? 'mp3',
         proxy: process.env.FISH_PROXY ?? fileConfig.fish?.proxy ?? '', // 例：http://127.0.0.1:7890
+        latency: process.env.FISH_LATENCY ?? fileConfig.fish?.latency ?? 'balanced', // balanced = 更快
     },
 
     // GitHub OAuth（登录用）
