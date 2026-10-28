@@ -73,6 +73,7 @@ const ttsError = ref(''); // 最近一次语音失败原因（界面上提示 8 
 const speechQueue = []; // 待合成的句子
 let speechEpoch = 0; // 每轮 +1，用来丢弃上一轮没播完的
 let draining = false;
+let pendingBlob = null; // 预取中的下一句音频
 
 // 所有语音共用这一个 <audio>：同一个元素在用户手势期间"解锁"过，
 // 之后即使隔十几秒再 play() 也不会被自动播放策略拦截。
@@ -98,6 +99,7 @@ function unlockPlayer() {
 function stopSpeech() { // 停播并清空队列
     speechEpoch += 1;
     speechQueue.length = 0;
+    pendingBlob = null;
     player.pause();
 }
 
@@ -124,11 +126,20 @@ async function drainSpeech() { // 顺序合成播放，保证不串音
     draining = true;
     while (speechQueue.length) {
         const item = speechQueue.shift();
-        if (item.epoch !== speechEpoch) continue;
+        if (item.epoch !== speechEpoch) {
+            pendingBlob = null;
+            continue;
+        }
 
         try {
-            const blob = await ttsBlob(item.text);
+            const blob = await (pendingBlob ?? ttsBlob(item.text));
+            pendingBlob = null;
             if (item.epoch !== speechEpoch) continue;
+
+            // 播放当前句的同时预取下一句，避免句与句之间空等
+            if (speechQueue.length && speechEpoch === item.epoch) {
+                pendingBlob = ttsBlob(speechQueue[0].text);
+            }
 
             const url = URL.createObjectURL(blob);
             await new Promise((resolve) => {

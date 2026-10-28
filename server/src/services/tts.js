@@ -61,25 +61,28 @@ export async function synthesize(text) {
     if (existsSync(cacheFile)) return readFileSync(cacheFile);
 
     const body = JSON.stringify({ text: clean, reference_id: modelId, format, latency: config.tts.latency });
-    let buf;
 
-    try {
-        const res = await fetch(`${apiUrl}/v1/tts`, {
-            method: 'POST',
-            headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-            body,
-            signal: AbortSignal.timeout(15_000),
-        });
-        if (!res.ok) {
-            const detail = (await res.text().catch(() => '')).slice(0, 200);
-            throw new TtsUnavailable(`TTS 返回 HTTP ${res.status}：${detail}`);
-        }
-        buf = Buffer.from(await res.arrayBuffer());
-    } catch (e) {
-        if (e instanceof TtsUnavailable) throw e;
-        // 直连失败（常见于国内网络）：走系统代理用 curl 重试
-        if (!config.tts.proxy) throw new TtsUnavailable(`连不上 TTS 服务：${e.message}`);
+    // 配了代理就直接走 curl：先 fetch 再回退会白等一次超时（10 秒以上）
+    let buf;
+    if (config.tts.proxy) {
         buf = await synthesizeViaCurl({ body, proxy: config.tts.proxy });
+    } else {
+        try {
+            const res = await fetch(`${apiUrl}/v1/tts`, {
+                method: 'POST',
+                headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+                body,
+                signal: AbortSignal.timeout(30_000),
+            });
+            if (!res.ok) {
+                const detail = (await res.text().catch(() => '')).slice(0, 200);
+                throw new TtsUnavailable(`TTS 返回 HTTP ${res.status}：${detail}`);
+            }
+            buf = Buffer.from(await res.arrayBuffer());
+        } catch (e) {
+            if (e instanceof TtsUnavailable) throw e;
+            throw new TtsUnavailable(`连不上 TTS 服务：${e.message}`);
+        }
     }
 
     if (buf[0] === 0x7b) { // 以 '{' 开头的是 JSON 错误体，不能当音频缓存
