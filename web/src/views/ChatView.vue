@@ -6,14 +6,6 @@
                 <template v-if="user">
                     <img v-if="user.avatar" :src="user.avatar" class="avatar" alt="" />
                     <span class="name">{{ user.login }}</span>
-                    <span v-if="speaking" class="tts-error" style="color: #8b93a5">语音…</span>
-                    <span v-if="ttsError" class="tts-error" :title="ttsError">语音不可用</span>
-                    <button class="link" :title="autoSpeak ? '关闭自动朗读' : '开启自动朗读'" @click="toggleSpeak">
-                        {{ autoSpeak ? '🔊' : '🔇' }}
-                    </button>
-                    <select v-model="model" class="model" :disabled="streaming" title="本轮使用的模型">
-                        <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
-                    </select>
                     <button class="link danger" :disabled="streaming" @click="doClear">清空</button>
                     <button class="link" @click="doLogout">退出</button>
                 </template>
@@ -56,7 +48,7 @@
 
 <script setup>
 import { nextTick, onMounted, ref } from 'vue';
-import { ApiError, clearMessages, fetchConfig, fetchMessages, fetchMe, logout, streamChat, ttsBlob } from '../api';
+import { ApiError, clearMessages, fetchConfig, fetchMessages, fetchMe, logout, streamChat } from '../api';
 
 const messages = ref([]); // 消息列表：{ role, content }
 const input = ref(''); // 输入框内容
@@ -65,96 +57,6 @@ const listEl = ref(null); // 消息列表 DOM，用于滚动
 const inputEl = ref(null); // 输入框 DOM，用于聚焦
 const user = ref(null); // 当前登录用户，null = 未登录
 const maxInputChars = ref(2000); // 单条输入上限，从后端配置读
-const models = ref([]); // 可选模型 [{ id, label }]
-const model = ref(localStorage.getItem('model') ?? ''); // 当前模型
-const autoSpeak = ref(localStorage.getItem('autoSpeak') !== '0'); // 边出字边朗读
-
-// ---------- 语音：整条消息生成完再播 ----------
-const ttsError = ref(''); // 最近的语音失败原因（提示 8 秒）
-const speaking = ref(false); // 是否正在合成/朗读
-let speechEpoch = 0; // 每轮 +1，用来丢弃上一轮的播放
-
-// 复用同一个 <audio>，在用户手势中解锁，之后隔多久都能播
-const player = new Audio();
-player.preload = 'auto';
-let playerUnlocked = false;
-const SILENT_WAV =
-    'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
-
-function unlockPlayer() {
-    if (playerUnlocked) return;
-    player.src = SILENT_WAV;
-    player.play().then(() => {
-        player.pause();
-        playerUnlocked = true;
-    }).catch(() => {});
-}
-
-function stopSpeech() { // 停播，作废本轮
-    speechEpoch += 1;
-    speaking.value = false;
-    player.pause();
-}
-
-/** 按标点把长文本切成不超过 300 字的段（后端单次上限 500 字） */
-function splitForTts(text) {
-    const chunks = [];
-    let buf = '';
-    for (const piece of text.split(/(?<=[。！？!?…\n])/)) {
-        if ([...buf].length + [...piece].length > 300 && buf) {
-            chunks.push(buf);
-            buf = '';
-        }
-        buf += piece;
-    }
-    if (buf.trim()) chunks.push(buf);
-    return chunks.map((c) => c.trim()).filter((c) => [...c].length >= 2);
-}
-
-/** 一次性拿到整条消息的所有音频，再按顺序播放 */
-async function speakWhole(text, epoch) {
-    if (!autoSpeak.value || !text.trim()) return;
-
-    const chunks = splitForTts(text);
-    if (!chunks.length) return;
-
-    speaking.value = true;
-    try {
-        // 并发合成所有段：总等待 ≈ 最慢的一段，而不是累加
-        const blobs = await Promise.all(chunks.map((c) => ttsBlob(c)));
-        if (epoch !== speechEpoch) return;
-
-        for (const blob of blobs) {
-            if (epoch !== speechEpoch) break;
-
-            const url = URL.createObjectURL(blob);
-            await new Promise((resolve) => {
-                player.onended = player.onerror = () => resolve();
-                player.src = url;
-                player.play().catch((e) => {
-                    console.warn('[tts] 播放被拒绝:', e.name, e.message);
-                    resolve();
-                });
-            });
-            URL.revokeObjectURL(url);
-        }
-    } catch (e) {
-        console.warn('[tts] 合成失败:', e.message);
-        ttsError.value = e.message;
-        setTimeout(() => {
-            if (ttsError.value === e.message) ttsError.value = '';
-        }, 8000);
-    } finally {
-        if (epoch === speechEpoch) speaking.value = false;
-    }
-}
-
-function toggleSpeak() {
-    unlockPlayer();
-    autoSpeak.value = !autoSpeak.value;
-    localStorage.setItem('autoSpeak', autoSpeak.value ? '1' : '0');
-    if (!autoSpeak.value) stopSpeech();
-}
 
 async function doClear() { // 清空本地 + 服务端历史，不可恢复
     if (streaming.value) return;
@@ -189,10 +91,6 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
     input.value = '';
     streaming.value = true;
 
-    unlockPlayer(); // 借这次点击解锁音频播放（之后隔多久都能播）
-    stopSpeech(); // 新一轮开始，丢弃上一轮未播完的语音
-    const epoch = speechEpoch;
-
     // 先占一个空气泡，后面按增量往里填
     messages.value.push({ role: 'assistant', content: '' });
     const index = messages.value.length - 1;
@@ -200,11 +98,9 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
     await nextTick();
     scrollToBottom();
 
-    let ok = false; // 只有正常答完才朗读，别把错误提示读出来
     try {
         await streamChat({
             text,
-            model: model.value,
             onDelta: (delta) => { // 只追加文字，语音等整条生成完再统一合成
                 messages.value[index].content += delta;
                 scrollToBottom();
@@ -220,7 +116,6 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
         // 其他失败：把空气泡替换成错误提示
         messages.value[index].content = `出错：${e.message}`;
     } finally {
-        if (ok && autoSpeak.value) speakWhole(messages.value[index].content, epoch); // 整条合成后再播
         streaming.value = false;
         await nextTick();
         scrollToBottom();
@@ -237,9 +132,6 @@ async function doLogout() { // 退出：清服务端 session + 清空界面，�
 onMounted(async () => { // 首次进入：读配置 → 查登录态 → （已登录才）加载历史 → 滚到底 → 聚焦输入框
     const cfg = await fetchConfig();
     maxInputChars.value = cfg.maxInputChars ?? 2000;
-    models.value = cfg.models ?? [];
-    if (!model.value) model.value = cfg.model ?? '';
-    if (!models.value.some((m) => m.id === model.value)) model.value = cfg.model ?? '';
 
     try {
         user.value = await fetchMe();
@@ -401,21 +293,6 @@ button {
     color: #fff;
     font: inherit;
     cursor: pointer;
-}
-
-.tts-error {
-    color: #e5484d;
-    font-size: 12px;
-    cursor: help;
-}
-
-.model {
-    padding: 2px 6px;
-    border: 1px solid #d5d9e2;
-    border-radius: 6px;
-    background: #fff;
-    color: #333;
-    font-size: 12px;
 }
 
 .link.danger {

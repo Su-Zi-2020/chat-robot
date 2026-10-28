@@ -61,21 +61,6 @@ export async function clearMessages() {
     return body.data;
 }
 
-/** 取一段文字的语音（返回 Blob）；失败抛 ApiError */
-export async function ttsBlob(text) {
-    const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ text }),
-    });
-
-    if (!res.ok) {
-        const body = await readJson(res);
-        throw new ApiError(body?.message ?? `语音合成失败（HTTP ${res.status}）`, body?.code, res.status);
-    }
-    return res.blob();
-}
-
 /** 当前登录用户；未登录返回 null */
 export async function fetchMe() { // 查登录态
     const res = await fetch('/api/auth/me');
@@ -97,11 +82,11 @@ export async function logout() { // 清服务端 session + cookie
  *
  * @returns {Promise<string>} 完整回复文本
  */
-export async function streamChat({ text, model, onDelta, signal }) { // 流式对话：返回完整文本，边收边回调
+export async function streamChat({ text, onDelta, signal }) { // 流式对话：返回完整文本，边收边回调
     const res = await fetch('/api/chat', {
         method: 'POST',
         headers: JSON_HEADERS,
-        body: JSON.stringify({ text, model }),
+        body: JSON.stringify({ text }),
         signal, // 外部可中断（关页面 / 停止按钮）
     });
 

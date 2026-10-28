@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { getDatabase } from '../config/database.js';
 import { config } from '../config.js';
 
-const PERSONA_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../docs/persona');
+const PERSONA_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../persona');
 let fullTextCache; // undefined = 未读；null = 读不到；string = 已读
 
 // 读取 SOUL.md + SKILL.md 全文（只读一次）。文件缺失时返回 null，退回精简版。

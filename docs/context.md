@@ -37,6 +37,7 @@ maxInputTokens > compactTriggerTokens + summaryMaxTokens + 保留区
 ```
 
 角色卡内容来自单例表 `persona`（`services/persona.js`，进程内缓存，保存后失效）。
+完整人设文件在 `server/persona/`（SOUL.md + SKILL.md），由 `config.personaFullText` 控制是否全文注入。
 
 ## 装配 `buildContext(userId)`
 

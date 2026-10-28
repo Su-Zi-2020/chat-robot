@@ -4,7 +4,7 @@
     "type": "module",
     "scripts": {
         "start": "node src/server.js",
-        "dev": "node --watch --watch-path=./src --watch-path=./config --watch-path=../docs/persona src/server.js",
+        "dev": "node --watch --watch-path=./src --watch-path=./config --watch-path=./persona src/server.js",
         "db:init": "node src/db/init.js",
         "db:tables": "node src/db/inspect.js",
         "db:reset": "rm -f data/agent.db data/agent.db-wal data/agent.db-shm && node src/db/init.js"
