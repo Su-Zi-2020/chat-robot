@@ -7,7 +7,7 @@ import messagesDAO from '../dao/messages.dao.js';
 import { buildContext, compactIfNeeded } from '../services/context.js';
 import { streamModel, UpstreamError } from '../services/llm.js';
 import { requireUser } from '../middleware/auth.js';
-import { config } from '../config.js';
+import { config, resolveModel } from '../config.js';
 
 const router = Router();
 
@@ -24,6 +24,12 @@ router.post('/', requireUser, async (req, res) => { // 主流程：校验 → �
         return fail(res, 400, CODE.BAD_PARAM, `text 过长（上限 ${config.context.maxMessageChars} 字）`);
     }
 
+    // 可选：本次对话用哪个模型（传 key 或 id）
+    const pickedModel = resolveModel(req.body?.model);
+    if (req.body?.model && !pickedModel) {
+        return fail(res, 400, CODE.BAD_PARAM, '不支持的 model');
+    }
+
     // 装配上下文：摘要 + 最近原文（按 token 预算裁剪，见 services/context.js）
     const history = buildContext(req.user.id);
     const messages = [...history, { role: 'user', content: text }];
@@ -34,7 +40,7 @@ router.post('/', requireUser, async (req, res) => { // 主流程：校验 → �
         if (!res.writableEnded) controller.abort(); // 正常结束时 writableEnded 为 true
     });
 
-    const stream = streamModel({ messages, signal: controller.signal });
+    const stream = streamModel({ messages, signal: controller.signal, model: pickedModel });
 
     // 先拉第一帧再建连：这样上游失败时还能返回 JSON 信封
     let first;

@@ -18,7 +18,11 @@ app.use(attachUser); // 先解析登录态，后面所有路由都能用 req.use
 
 // 公开配置：前端用它渲染输入上限等，避免前后端各写一份常量
 app.post('/api/config', (_req, res) => {
-    success(res, { maxInputChars: config.context.maxMessageChars });
+    success(res, {
+        maxInputChars: config.context.maxMessageChars,
+        models: config.models, // [{ key, id, label }]
+        model: config.model, // 默认模型 id
+    });
 });
 
 app.use('/api/auth', authRouter); // 登录 / 回调 / 我是谁 / 登出

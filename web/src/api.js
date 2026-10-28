@@ -28,7 +28,7 @@ export async function fetchConfig() {
     } catch {
         // 后端没起来时用默认值
     }
-    return { maxInputChars: 2000 };
+    return { maxInputChars: 2000, models: [], model: '' };
 }
 
 /** 取历史消息 */
@@ -82,11 +82,11 @@ export async function logout() { // 清服务端 session + cookie
  *
  * @returns {Promise<string>} 完整回复文本
  */
-export async function streamChat({ text, onDelta, signal }) { // 流式对话：返回完整文本，边收边回调
+export async function streamChat({ text, model, onDelta, signal }) { // 流式对话：返回完整文本，边收边回调
     const res = await fetch('/api/chat', {
         method: 'POST',
         headers: JSON_HEADERS,
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, model }),
         signal, // 外部可中断（关页面 / 停止按钮）
     });
 

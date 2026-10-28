@@ -6,6 +6,9 @@
                 <template v-if="user">
                     <img v-if="user.avatar" :src="user.avatar" class="avatar" alt="" />
                     <span class="name">{{ user.login }}</span>
+                    <select v-model="model" class="model" :disabled="streaming" title="本轮使用的模型">
+                        <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+                    </select>
                     <button class="link danger" :disabled="streaming" @click="doClear">清空</button>
                     <button class="link" @click="doLogout">退出</button>
                 </template>
@@ -57,6 +60,8 @@ const listEl = ref(null); // 消息列表 DOM，用于滚动
 const inputEl = ref(null); // 输入框 DOM，用于聚焦
 const user = ref(null); // 当前登录用户，null = 未登录
 const maxInputChars = ref(2000); // 单条输入上限，从后端配置读
+const models = ref([]); // 可选模型 [{ id, label }]
+const model = ref(localStorage.getItem('model') ?? ''); // 当前模型
 
 async function doClear() { // 清空本地 + 服务端历史，不可恢复
     if (streaming.value) return;
@@ -100,6 +105,7 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
     try {
         await streamChat({
             text,
+            model: model.value,
             onDelta: (delta) => { // 每收到一段增量就追加并滚动
                 messages.value[index].content += delta;
                 scrollToBottom();
@@ -130,6 +136,9 @@ async function doLogout() { // 退出：清服务端 session + 清空界面，�
 onMounted(async () => { // 首次进入：读配置 → 查登录态 → （已登录才）加载历史 → 滚到底 → 聚焦输入框
     const cfg = await fetchConfig();
     maxInputChars.value = cfg.maxInputChars ?? 2000;
+    models.value = cfg.models ?? [];
+    if (!model.value) model.value = cfg.model ?? '';
+    if (!models.value.some((m) => m.id === model.value)) model.value = cfg.model ?? '';
 
     try {
         user.value = await fetchMe();
@@ -291,6 +300,15 @@ button {
     color: #fff;
     font: inherit;
     cursor: pointer;
+}
+
+.model {
+    padding: 2px 6px;
+    border: 1px solid #d5d9e2;
+    border-radius: 6px;
+    background: #fff;
+    color: #333;
+    font-size: 12px;
 }
 
 .link.danger {

@@ -27,7 +27,7 @@ function withTimeout(signal) {
     return { signal: AbortSignal.any([signal, timeout]), isTimeout: () => timeout.aborted };
 }
 
-export async function* streamModel({ messages, signal: outerSignal }) {
+export async function* streamModel({ messages, signal: outerSignal, model }) {
     if (!config.apiKey) {
         throw new UpstreamError('服务端没有配置 API key（环境变量 DEEPSEEK_API_KEY 或 server/config/config.js）', 500);
     }
@@ -42,7 +42,7 @@ export async function* streamModel({ messages, signal: outerSignal }) {
                 'content-type': 'application/json',
                 authorization: `Bearer ${config.apiKey}`,
             },
-            body: JSON.stringify({ model: config.model, messages, stream: true }),
+            body: JSON.stringify({ model: model ?? config.model, messages, stream: true }),
             signal,
         });
     } catch (e) {
@@ -90,7 +90,7 @@ export async function* streamModel({ messages, signal: outerSignal }) {
  * 非流式调用（摘要等内部任务用）。不走 SSE，一次性拿结果。
  * @returns {Promise<string>}
  */
-export async function complete({ messages, maxTokens = 800, signal: outerSignal }) {
+export async function complete({ messages, maxTokens = 800, signal: outerSignal, model }) {
     if (!config.apiKey) throw new UpstreamError('服务端没有配置 API key', 500);
 
     const { signal, isTimeout } = withTimeout(outerSignal);
@@ -100,7 +100,7 @@ export async function complete({ messages, maxTokens = 800, signal: outerSignal 
         res = await fetch(`${config.baseUrl}/chat/completions`, {
             method: 'POST',
             headers: { 'content-type': 'application/json', authorization: `Bearer ${config.apiKey}` },
-            body: JSON.stringify({ model: config.model, messages, max_tokens: maxTokens, temperature: 0.3 }),
+            body: JSON.stringify({ model: model ?? config.summaryModel, messages, max_tokens: maxTokens, temperature: 0.3 }),
             signal,
         });
     } catch (e) {

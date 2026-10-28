@@ -12,10 +12,34 @@ try {
     // 没有本地配置文件是正常情况
 }
 
+// 可选模型：key 用于界面展示和请求参数，id 是真正发给 API 的名字。
+// 想加模型就在这里加一行；请求里传 key 或 id 都能识别。
+const MODELS = [
+    { key: 'flash', id: 'deepseek-flash', label: 'Flash · 快' },
+    { key: 'pro', id: 'deepseek-v4-pro', label: 'V4 Pro · 聪明' },
+];
+
+function pickModel(value) {
+    if (value === 'deepseek-chat') return MODELS[0]; // 旧配置的别名
+    return MODELS.find((m) => m.key === value || m.id === value) ?? MODELS[0];
+}
+
+/** 把请求里的 key 或 id 解析成模型 id；不认识返回 null */
+export function resolveModel(value) {
+    if (!value) return null;
+    if (value === 'deepseek-chat') return MODELS[0].id; // 旧配置的别名
+    const hit = MODELS.find((m) => m.key === value || m.id === value);
+    return hit ? hit.id : null;
+}
+
+const defaultModel = pickModel(process.env.API_MODEL ?? fileConfig.model ?? 'flash');
+
 export const config = {
     apiKey: process.env.DEEPSEEK_API_KEY ?? fileConfig.apiKey ?? '',
     baseUrl: (process.env.API_BASE_URL ?? fileConfig.baseUrl ?? 'https://api.deepseek.com/v1').replace(/\/+$/, ''), // 去掉结尾斜杠，拼路径不会出现 //
-    model: process.env.API_MODEL ?? fileConfig.model ?? 'deepseek-chat',
+    models: MODELS, // 可选模型列表（前端下拉用）
+    model: defaultModel.id, // 默认模型
+    summaryModel: process.env.SUMMARY_MODEL ?? 'deepseek-flash', // 摘要用便宜模型
     context: contextConfig, // 上下文与压缩参数，见 config/context.js
 
     // 角色设定的来源：true = 把 docs/persona/SOUL.md + SKILL.md 全文塞进上下文；
