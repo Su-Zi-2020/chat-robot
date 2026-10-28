@@ -1,6 +1,29 @@
 // 角色卡：单例（id = 1），进程内缓存，保存后失效重读。
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
 import { getDatabase } from '../config/database.js';
+import { config } from '../config.js';
+
+const PERSONA_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../docs/persona');
+let fullTextCache; // undefined = 未读；null = 读不到；string = 已读
+
+// 读取 SOUL.md + SKILL.md 全文（只读一次）。文件缺失时返回 null，退回精简版。
+function loadFullText() {
+    if (fullTextCache !== undefined) return fullTextCache;
+    try {
+        const soul = readFileSync(join(PERSONA_DIR, 'SOUL.md'), 'utf8').trim();
+        const skill = readFileSync(join(PERSONA_DIR, 'SKILL.md'), 'utf8').trim();
+        fullTextCache = `${soul}\n\n---\n\n${skill}`;
+        console.log(`[persona] 已加载全量设定（${fullTextCache.length} 字符）`);
+    } catch (e) {
+        console.warn('[persona] 读取设定文件失败，退回精简版:', e.message);
+        fullTextCache = null;
+    }
+    return fullTextCache;
+}
 
 let cache = null;
 
@@ -55,7 +78,9 @@ export function savePersona({ name, avatar, prompt, examples, tailPrompt }) {
 export function personaMessages() {
     const p = getPersona();
 
-    const parts = [p.prompt.trim()];
+    // 全量模式：SOUL + SKILL 原文优先，DB 里的精简 prompt 作为兜底
+    const full = config.personaFullText ? loadFullText() : null;
+    const parts = [(full ?? p.prompt).trim()];
     if (p.examples.length) {
         parts.push('示例：');
         for (const [user, assistant] of p.examples) {

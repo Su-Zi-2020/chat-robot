@@ -18,6 +18,10 @@ export const config = {
     model: process.env.API_MODEL ?? fileConfig.model ?? 'deepseek-chat',
     context: contextConfig, // 上下文与压缩参数，见 config/context.js
 
+    // 角色设定的来源：true = 把 docs/persona/SOUL.md + SKILL.md 全文塞进上下文；
+    // false = 只用 persona 表里的精简版。文件不存在时自动退回精简版。
+    personaFullText: (process.env.PERSONA_FULL ?? '1') === '1',
+
     // GitHub OAuth（登录用）
     github: {
         clientId: process.env.GITHUB_CLIENT_ID ?? fileConfig.github?.clientId ?? '',
