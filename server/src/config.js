@@ -46,6 +46,15 @@ export const config = {
     // false = 只用 persona 表里的精简版。文件不存在时自动退回精简版。
     personaFullText: (process.env.PERSONA_FULL ?? '1') === '1',
 
+    // TTS（Fish Audio）：没有配置 key 时 /api/tts 返回 503，不影响文字聊天
+    tts: {
+        apiUrl: (process.env.FISH_API_URL ?? 'https://api.fish.audio').replace(/\/+$/, ''),
+        apiKey: process.env.FISH_API_KEY ?? fileConfig.fish?.apiKey ?? '',
+        modelId: process.env.FISH_MODEL_ID ?? fileConfig.fish?.modelId ?? '',
+        format: process.env.FISH_FORMAT ?? 'mp3',
+        proxy: process.env.FISH_PROXY ?? fileConfig.fish?.proxy ?? '', // 例：http://127.0.0.1:7890
+    },
+
     // GitHub OAuth（登录用）
     github: {
         clientId: process.env.GITHUB_CLIENT_ID ?? fileConfig.github?.clientId ?? '',

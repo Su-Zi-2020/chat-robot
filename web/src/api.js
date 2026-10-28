@@ -61,6 +61,21 @@ export async function clearMessages() {
     return body.data;
 }
 
+/** 取一段文字的语音（返回 Blob）；失败抛 ApiError */
+export async function ttsBlob(text) {
+    const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ text }),
+    });
+
+    if (!res.ok) {
+        const body = await readJson(res);
+        throw new ApiError(body?.message ?? `语音合成失败（HTTP ${res.status}）`, body?.code, res.status);
+    }
+    return res.blob();
+}
+
 /** 当前登录用户；未登录返回 null */
 export async function fetchMe() { // 查登录态
     const res = await fetch('/api/auth/me');

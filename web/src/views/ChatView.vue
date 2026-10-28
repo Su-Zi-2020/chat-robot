@@ -6,6 +6,9 @@
                 <template v-if="user">
                     <img v-if="user.avatar" :src="user.avatar" class="avatar" alt="" />
                     <span class="name">{{ user.login }}</span>
+                    <button class="link" :title="autoSpeak ? '关闭自动朗读' : '开启自动朗读'" @click="toggleSpeak">
+                        {{ autoSpeak ? '🔊' : '🔇' }}
+                    </button>
                     <select v-model="model" class="model" :disabled="streaming" title="本轮使用的模型">
                         <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
                     </select>
@@ -51,7 +54,7 @@
 
 <script setup>
 import { nextTick, onMounted, ref } from 'vue';
-import { ApiError, clearMessages, fetchConfig, fetchMessages, fetchMe, logout, streamChat } from '../api';
+import { ApiError, clearMessages, fetchConfig, fetchMessages, fetchMe, logout, streamChat, ttsBlob } from '../api';
 
 const messages = ref([]); // 消息列表：{ role, content }
 const input = ref(''); // 输入框内容
@@ -62,9 +65,76 @@ const user = ref(null); // 当前登录用户，null = 未登录
 const maxInputChars = ref(2000); // 单条输入上限，从后端配置读
 const models = ref([]); // 可选模型 [{ id, label }]
 const model = ref(localStorage.getItem('model') ?? ''); // 当前模型
+const autoSpeak = ref(localStorage.getItem('autoSpeak') !== '0'); // 边出字边朗读
+
+// ---------- 语音：按句合成、顺序播放 ----------
+const speechQueue = []; // 待合成的句子
+let speechEpoch = 0; // 每轮 +1，用来丢弃上一轮没播完的
+let playing = null; // 当前播放的 Audio
+let draining = false;
+
+function stopSpeech() { // 停播并清空队列
+    speechEpoch += 1;
+    speechQueue.length = 0;
+    if (playing) {
+        playing.pause();
+        playing = null;
+    }
+}
+
+// 从累积文本里切出完整句子
+function takeSentences(buf) {
+    const matched = buf.match(/[^。！？!?…\n]+[。！？!?…\n]+/g) ?? [];
+    const rest = buf.slice(matched.join('').length);
+    const sentences = matched.filter((x) => x.trim().length >= 2);
+
+    if ([...rest].length > 60) { // 长时间没标点，强制切一刀，避免一直不播
+        sentences.push(rest);
+        return { sentences, rest: '' };
+    }
+    return { sentences, rest };
+}
+
+function enqueueSpeech(text, epoch) {
+    if (!autoSpeak.value || !text.trim()) return;
+    speechQueue.push({ text, epoch });
+    if (!draining) drainSpeech();
+}
+
+async function drainSpeech() { // 顺序合成播放，保证不串音
+    draining = true;
+    while (speechQueue.length) {
+        const item = speechQueue.shift();
+        if (item.epoch !== speechEpoch) continue;
+
+        try {
+            const blob = await ttsBlob(item.text);
+            if (item.epoch !== speechEpoch) continue;
+
+            const url = URL.createObjectURL(blob);
+            await new Promise((resolve) => {
+                playing = new Audio(url);
+                playing.onended = playing.onerror = () => resolve();
+                playing.play().catch(() => resolve()); // 浏览器拦截自动播放时安静跳过
+            });
+            URL.revokeObjectURL(url);
+            playing = null;
+        } catch {
+            // 语音失败不影响文字，继续下一句
+        }
+    }
+    draining = false;
+}
+
+function toggleSpeak() {
+    autoSpeak.value = !autoSpeak.value;
+    localStorage.setItem('autoSpeak', autoSpeak.value ? '1' : '0');
+    if (!autoSpeak.value) stopSpeech();
+}
 
 async function doClear() { // 清空本地 + 服务端历史，不可恢复
     if (streaming.value) return;
+    stopSpeech();
     if (!confirm('清空全部聊天记录？数据库里的也会删除，无法恢复。')) return;
     try {
         await clearMessages();
@@ -95,6 +165,10 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
     input.value = '';
     streaming.value = true;
 
+    stopSpeech(); // 新一轮开始，丢弃上一轮未播完的语音
+    const epoch = speechEpoch;
+    let speechBuf = ''; // 尚未成句的文本
+
     // 先占一个空气泡，后面按增量往里填
     messages.value.push({ role: 'assistant', content: '' });
     const index = messages.value.length - 1;
@@ -106,9 +180,14 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
         await streamChat({
             text,
             model: model.value,
-            onDelta: (delta) => { // 每收到一段增量就追加并滚动
+            onDelta: (delta) => { // 追加并滚动；同时按句切分送去合成
                 messages.value[index].content += delta;
                 scrollToBottom();
+
+                speechBuf += delta;
+                const { sentences, rest } = takeSentences(speechBuf);
+                speechBuf = rest;
+                for (const sentence of sentences) enqueueSpeech(sentence, epoch);
             },
         });
     } catch (e) {
@@ -120,6 +199,8 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
         // 其他失败：把空气泡替换成错误提示
         messages.value[index].content = `出错：${e.message}`;
     } finally {
+        if (speechBuf.trim()) enqueueSpeech(speechBuf, epoch); // 收尾剩下的半句
+        speechBuf = '';
         streaming.value = false;
         await nextTick();
         scrollToBottom();
