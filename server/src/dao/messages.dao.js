@@ -18,6 +18,17 @@ class MessagesDAO {
             .all(userId);
     }
 
+    /** 清空某用户的全部历史（消息 + 摘要水位线），返回删除的消息条数 */
+    clearAll(userId) {
+        const db = getDatabase();
+        const tx = db.transaction(() => {
+            const info = db.prepare('DELETE FROM messages WHERE user_id = ?').run(userId);
+            db.prepare('DELETE FROM conversation_state WHERE user_id = ?').run(userId);
+            return info.changes;
+        });
+        return tx();
+    }
+
     /** 一问一答成对写入：放在同一个事务里，不会只写成功一半 */
     appendExchange(userText, assistantText, userId = null) {
         const db = getDatabase();

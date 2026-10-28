@@ -199,6 +199,18 @@ POST /api/persona/save
 
 限制：`name` ≤20 字、`prompt` ≤1000 字、`tailPrompt` ≤120 字、`examples` ≤5 组且每组 ≤100 字。
 
+### 清空历史
+
+```http
+POST /api/messages/clear
+```
+
+删除当前用户的**全部消息 + 摘要**（不可恢复），返回删除条数：
+
+```json
+{ "code": 0, "message": "success", "data": { "removed": 10 } }
+```
+
 ## 5. 登录接口
 
 | 接口 | 说明 | 成功 |

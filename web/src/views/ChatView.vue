@@ -6,6 +6,7 @@
                 <template v-if="user">
                     <img v-if="user.avatar" :src="user.avatar" class="avatar" alt="" />
                     <span class="name">{{ user.login }}</span>
+                    <button class="link danger" :disabled="streaming" @click="doClear">清空</button>
                     <button class="link" @click="doLogout">退出</button>
                 </template>
                 <a v-else class="link" href="/api/auth/github">用 GitHub 登录</a>
@@ -47,7 +48,7 @@
 
 <script setup>
 import { nextTick, onMounted, ref } from 'vue';
-import { ApiError, fetchConfig, fetchMessages, fetchMe, logout, streamChat } from '../api';
+import { ApiError, clearMessages, fetchConfig, fetchMessages, fetchMe, logout, streamChat } from '../api';
 
 const messages = ref([]); // 消息列表：{ role, content }
 const input = ref(''); // 输入框内容
@@ -56,6 +57,17 @@ const listEl = ref(null); // 消息列表 DOM，用于滚动
 const inputEl = ref(null); // 输入框 DOM，用于聚焦
 const user = ref(null); // 当前登录用户，null = 未登录
 const maxInputChars = ref(2000); // 单条输入上限，从后端配置读
+
+async function doClear() { // 清空本地 + 服务端历史，不可恢复
+    if (streaming.value) return;
+    if (!confirm('清空全部聊天记录？数据库里的也会删除，无法恢复。')) return;
+    try {
+        await clearMessages();
+        messages.value = [];
+    } catch (e) {
+        alert(e instanceof ApiError ? e.message : '清空失败，请稍后重试');
+    }
+}
 
 function scrollToBottom() { // 滚到底部（发消息、收到增量、加载完成后调用）
     const el = listEl.value;
@@ -279,6 +291,15 @@ button {
     color: #fff;
     font: inherit;
     cursor: pointer;
+}
+
+.link.danger {
+    color: #e5484d;
+}
+
+.link:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 button:disabled {

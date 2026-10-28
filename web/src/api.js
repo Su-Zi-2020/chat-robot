@@ -46,6 +46,21 @@ export async function fetchMessages() { // 拉取当前用户的全部历史
     return body.data.messages ?? [];
 }
 
+/** 清空当前用户的全部历史（服务端数据库一并删除，不可恢复） */
+export async function clearMessages() {
+    const res = await fetch('/api/messages/clear', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: '{}',
+    });
+
+    const body = await readJson(res);
+    if (!body || body.code !== 0) {
+        throw new ApiError(body?.message ?? `清空失败（HTTP ${res.status}）`, body?.code, res.status);
+    }
+    return body.data;
+}
+
 /** 当前登录用户；未登录返回 null */
 export async function fetchMe() { // 查登录态
     const res = await fetch('/api/auth/me');
