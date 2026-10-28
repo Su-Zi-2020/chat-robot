@@ -10,12 +10,22 @@ import { config } from '../config.js';
 const PERSONA_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../docs/persona');
 let fullTextCache; // undefined = 未读；null = 读不到；string = 已读
 
+// 去掉写给人看的元信息（版本号、日期、开发笔记），避免污染模型上下文：
+//   > v2.1.2 | 7维分流 + 5条anchor + 2.0下头梗规则 | 2026-05-17
+function stripMeta(text) {
+    const lines = text
+        .split('\n')
+        .filter((line) => !/^\s*>/.test(line)) // 引用块：版本、日期、开发备注
+        .filter((_, i, arr) => !(i === 0 && /^#\s/.test(arr[0] ?? ''))); // 文档标题
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 // 读取 SOUL.md + SKILL.md 全文（只读一次）。文件缺失时返回 null，退回精简版。
 function loadFullText() {
     if (fullTextCache !== undefined) return fullTextCache;
     try {
-        const soul = readFileSync(join(PERSONA_DIR, 'SOUL.md'), 'utf8').trim();
-        const skill = readFileSync(join(PERSONA_DIR, 'SKILL.md'), 'utf8').trim();
+        const soul = stripMeta(readFileSync(join(PERSONA_DIR, 'SOUL.md'), 'utf8'));
+        const skill = stripMeta(readFileSync(join(PERSONA_DIR, 'SKILL.md'), 'utf8'));
         fullTextCache = `${soul}\n\n---\n\n${skill}`;
         console.log(`[persona] 已加载全量设定（${fullTextCache.length} 字符）`);
     } catch (e) {
@@ -79,8 +89,10 @@ export function personaMessages() {
     const p = getPersona();
 
     // 全量模式：SOUL + SKILL 原文优先，DB 里的精简 prompt 作为兜底
+    // 文件名/标题已剥离，所以这里补一行身份说明，否则模型不知道自己在扮演谁
     const full = config.personaFullText ? loadFullText() : null;
-    const parts = [(full ?? p.prompt).trim()];
+    const head = full ? `你是「${p.name}」。以下是你的人格设定与互动规则，照它行事：\n\n${full}` : p.prompt;
+    const parts = [head.trim()];
     if (p.examples.length) {
         parts.push('示例：');
         for (const [user, assistant] of p.examples) {
