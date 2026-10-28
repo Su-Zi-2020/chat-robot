@@ -6,6 +6,7 @@
                 <template v-if="user">
                     <img v-if="user.avatar" :src="user.avatar" class="avatar" alt="" />
                     <span class="name">{{ user.login }}</span>
+                    <span v-if="ttsError" class="tts-error" :title="ttsError">语音不可用</span>
                     <button class="link" :title="autoSpeak ? '关闭自动朗读' : '开启自动朗读'" @click="toggleSpeak">
                         {{ autoSpeak ? '🔊' : '🔇' }}
                     </button>
@@ -66,20 +67,38 @@ const maxInputChars = ref(2000); // 单条输入上限，从后端配置读
 const models = ref([]); // 可选模型 [{ id, label }]
 const model = ref(localStorage.getItem('model') ?? ''); // 当前模型
 const autoSpeak = ref(localStorage.getItem('autoSpeak') !== '0'); // 边出字边朗读
+const ttsError = ref(''); // 最近一次语音失败原因（界面上提示 8 秒）
 
 // ---------- 语音：按句合成、顺序播放 ----------
 const speechQueue = []; // 待合成的句子
 let speechEpoch = 0; // 每轮 +1，用来丢弃上一轮没播完的
-let playing = null; // 当前播放的 Audio
 let draining = false;
+
+// 所有语音共用这一个 <audio>：同一个元素在用户手势期间"解锁"过，
+// 之后即使隔十几秒再 play() 也不会被自动播放策略拦截。
+const player = new Audio();
+player.preload = 'auto';
+let playerUnlocked = false;
+
+// 1 个采样的静音 wav，用来在用户点击时解锁播放器
+const SILENT_WAV =
+    'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+
+function unlockPlayer() {
+    if (playerUnlocked) return;
+    player.src = SILENT_WAV;
+    player.play().then(() => {
+        player.pause();
+        playerUnlocked = true;
+    }).catch(() => {
+        // 解锁失败也不影响后续尝试
+    });
+}
 
 function stopSpeech() { // 停播并清空队列
     speechEpoch += 1;
     speechQueue.length = 0;
-    if (playing) {
-        playing.pause();
-        playing = null;
-    }
+    player.pause();
 }
 
 // 从累积文本里切出完整句子
@@ -113,20 +132,28 @@ async function drainSpeech() { // 顺序合成播放，保证不串音
 
             const url = URL.createObjectURL(blob);
             await new Promise((resolve) => {
-                playing = new Audio(url);
-                playing.onended = playing.onerror = () => resolve();
-                playing.play().catch(() => resolve()); // 浏览器拦截自动播放时安静跳过
+                player.onended = player.onerror = () => resolve();
+                player.src = url;
+                player.play().catch((e) => {
+                    console.warn('[tts] 播放被拒绝:', e.name, e.message);
+                    resolve();
+                });
             });
             URL.revokeObjectURL(url);
-            playing = null;
-        } catch {
-            // 语音失败不影响文字，继续下一句
+        } catch (e) {
+            console.warn('[tts] 合成失败:', e.message);
+            ttsError.value = e.message;
+            const current = e.message;
+            setTimeout(() => {
+                if (ttsError.value === current) ttsError.value = '';
+            }, 8000);
         }
     }
     draining = false;
 }
 
 function toggleSpeak() {
+    unlockPlayer();
     autoSpeak.value = !autoSpeak.value;
     localStorage.setItem('autoSpeak', autoSpeak.value ? '1' : '0');
     if (!autoSpeak.value) stopSpeech();
@@ -165,6 +192,7 @@ async function send() { // 发送：上屏 → 占位气泡 → 流式回填 →
     input.value = '';
     streaming.value = true;
 
+    unlockPlayer(); // 借这次点击解锁音频播放（之后隔多久都能播）
     stopSpeech(); // 新一轮开始，丢弃上一轮未播完的语音
     const epoch = speechEpoch;
     let speechBuf = ''; // 尚未成句的文本
@@ -381,6 +409,12 @@ button {
     color: #fff;
     font: inherit;
     cursor: pointer;
+}
+
+.tts-error {
+    color: #e5484d;
+    font-size: 12px;
+    cursor: help;
 }
 
 .model {
