@@ -1,5 +1,7 @@
 # 角色设定源文件
 
+> 与原仓库的差异：删除了文件顶部的一行版本号（`> v2.1.2 | …`），其余内容一致。
+
 这两个文件来自社区项目 [colourfulmaster/milkgreen-skill](https://github.com/colourfulmaster/milkgreen-skill)
 （CC-BY-NC-4.0，非官方、禁止商用），是本项目角色的**源文件**，不直接进入模型上下文。
 
